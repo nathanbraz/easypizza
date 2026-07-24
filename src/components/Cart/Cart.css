@@ -8,9 +8,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(249, 115, 22, 0.15);
   z-index: 100;
-  border-color: rgba(249, 115, 22, 0.2);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  background: var(--bg-card) !important;
+  backdrop-filter: none !important;
 }
 
 .cart-info {

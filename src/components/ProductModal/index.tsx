@@ -1,24 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
-import { fakeProducts, fakeDrinks, pizzaSizes, crustOptions, addons } from '../../pages/MenuPage/fakeData';
-import type { Product } from '../../pages/MenuPage/fakeData';
 import './ProductModal.css';
+
+import type { Product } from '../../types';
 
 interface ProductModalProps {
   product: Product;
+  availableProducts: Product[]; // All products from the API (for half/half and drinks)
   onClose: () => void;
   onAddToCart: (item: any) => void;
 }
 
-export default function ProductModal({ product, onClose, onAddToCart }: ProductModalProps) {
-  const [size, setSize] = useState(pizzaSizes[1]); // Média por padrão
+export default function ProductModal({ product, availableProducts, onClose, onAddToCart }: ProductModalProps) {
+  
+  // Real or mock local sizes/crusts/addons (in a real app, this would come from the API, 
+  // but since we only created Product Categories, we will mock the variations here for UX)
+  const pizzaSizes = [
+    { id: 'sm', name: 'Pequena (4 fatias)', multiplier: 0.7 },
+    { id: 'md', name: 'Média (6 fatias)', multiplier: 1 },
+    { id: 'lg', name: 'Grande (8 fatias)', multiplier: 1.2 },
+  ];
+  
+  const crustOptions = [
+    { id: 'normal', name: 'Borda Tradicional', price: 0 },
+    { id: 'catupiry', name: 'Recheada com Catupiry', price: 8.00 },
+    { id: 'cheddar', name: 'Recheada com Cheddar', price: 8.00 },
+  ];
+  
+  const addons = [
+    { id: 'bacon', name: 'Extra Bacon', price: 5.00 },
+    { id: 'cheese', name: 'Extra Queijo', price: 4.00 },
+    { id: 'olives', name: 'Azeitonas', price: 2.00 },
+  ];
+
+  const [size, setSize] = useState(pizzaSizes[1]); // Média
   const [crust, setCrust] = useState(crustOptions[0]);
   const [isHalfHalf, setIsHalfHalf] = useState(false);
-  const [secondHalf, setSecondHalf] = useState<Product | null>(null);
+  const [secondHalf, setSecondHalf] = useState<any | null>(null);
   const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
-  const [selectedDrinks, setSelectedDrinks] = useState<Product[]>([]);
+  const [selectedDrinks, setSelectedDrinks] = useState<any[]>([]);
   const [observation, setObservation] = useState('');
   const [quantity, setQuantity] = useState(1);
+  
+  const isPizza = product.categoryName?.toLowerCase().includes('pizza') ?? true;
 
   // Trava o scroll da página de fundo
   useEffect(() => {
@@ -30,11 +54,12 @@ export default function ProductModal({ product, onClose, onAddToCart }: ProductM
     setSelectedAddons(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
   };
 
-  const toggleDrink = (drink: Product) => {
+  const toggleDrink = (drink: any) => {
     setSelectedDrinks(prev => prev.find(d => d.id === drink.id) ? prev.filter(d => d.id !== drink.id) : [...prev, drink]);
   };
 
   // Cálculos financeiros do Pedido
+  // Pricing Logic (Half and Half uses the AVERAGE between the two)
   const basePrice = product.price * size.multiplier;
   const halfPrice = isHalfHalf && secondHalf 
     ? ((basePrice / 2) + ((secondHalf.price * size.multiplier) / 2)) 
@@ -75,7 +100,13 @@ export default function ProductModal({ product, onClose, onAddToCart }: ProductM
         </button>
         
         <div className="modal-header-image">
-          <img src={product.image} alt={product.name} />
+          {product.imageUrl ? (
+             <img src={product.imageUrl} alt={product.name} />
+          ) : (
+             <div style={{ height: '200px', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <h3>{product.name}</h3>
+             </div>
+          )}
         </div>
 
         <div className="modal-scroll-area">
@@ -84,42 +115,46 @@ export default function ProductModal({ product, onClose, onAddToCart }: ProductM
             <p>{product.description}</p>
           </div>
 
-          <section className="modal-section">
-            <div className="section-header">
-              <h3>Escolha o Tamanho</h3>
-              <span className="required-badge">Obrigatório</span>
-            </div>
-            <div className="radio-group">
-              {pizzaSizes.map(s => (
-                <label key={s.id} className={`radio-card ${size.id === s.id ? 'selected' : ''}`}>
-                  <input type="radio" name="size" checked={size.id === s.id} onChange={() => setSize(s)} />
-                  <div className="radio-info">
-                    <span className="name">{s.name}</span>
-                    <span className="price">R$ {(product.price * s.multiplier).toFixed(2)}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </section>
+          {isPizza && (
+            <section className="modal-section">
+              <div className="section-header">
+                <h3>Escolha o Tamanho</h3>
+                <span className="required-badge">Obrigatório</span>
+              </div>
+              <div className="radio-group">
+                {pizzaSizes.map(s => (
+                  <label key={s.id} className={`radio-card ${size.id === s.id ? 'selected' : ''}`}>
+                    <input type="radio" name="size" checked={size.id === s.id} onChange={() => setSize(s)} />
+                    <div className="radio-info">
+                      <span className="name">{s.name}</span>
+                      <span className="price">R$ {(product.price * s.multiplier).toFixed(2)}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
 
-          <section className="modal-section">
-            <div className="section-header">
-              <h3>Borda da Pizza</h3>
-            </div>
-            <div className="radio-group">
-              {crustOptions.map(c => (
-                <label key={c.id} className={`radio-card ${crust.id === c.id ? 'selected' : ''}`}>
-                  <input type="radio" name="crust" checked={crust.id === c.id} onChange={() => setCrust(c)} />
-                  <div className="radio-info">
-                    <span className="name">{c.name}</span>
-                    <span className="price">{c.price > 0 ? `+ R$ ${c.price.toFixed(2)}` : 'Grátis'}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </section>
+          {isPizza && (
+            <section className="modal-section">
+              <div className="section-header">
+                <h3>Borda da Pizza</h3>
+              </div>
+              <div className="radio-group">
+                {crustOptions.map(c => (
+                  <label key={c.id} className={`radio-card ${crust.id === c.id ? 'selected' : ''}`}>
+                    <input type="radio" name="crust" checked={crust.id === c.id} onChange={() => setCrust(c)} />
+                    <div className="radio-info">
+                      <span className="name">{c.name}</span>
+                      <span className="price">{c.price > 0 ? `+ R$ ${c.price.toFixed(2)}` : 'Grátis'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
 
-          {size.id !== 'sm' && (
+          {isPizza && size.id !== 'sm' && (
             <section className="modal-section highlight-section">
               <div className="section-header">
                 <h3>Dividir Sabores? (Meio a Meio)</h3>
@@ -137,9 +172,11 @@ export default function ProductModal({ product, onClose, onAddToCart }: ProductM
                 <div className="half-half-selection">
                   <h4>Escolha a segunda metade:</h4>
                   <div className="horizontal-scroll">
-                    {fakeProducts.filter(p => p.id !== product.id).map(p => (
+                    {availableProducts
+                       .filter(p => p.categoryId === product.categoryId && p.id !== product.id)
+                       .map(p => (
                       <div key={p.id} className={`half-card ${secondHalf?.id === p.id ? 'selected' : ''}`} onClick={() => setSecondHalf(p)}>
-                        <img src={p.image} alt={p.name} />
+                        <div className="half-card-img-placeholder"></div>
                         <span>{p.name}</span>
                       </div>
                     ))}
@@ -149,35 +186,41 @@ export default function ProductModal({ product, onClose, onAddToCart }: ProductM
             </section>
           )}
 
-          <section className="modal-section">
-            <div className="section-header">
-              <h3>Adicionais Extras</h3>
-            </div>
-            <div className="checkbox-group">
-              {addons.map(a => (
-                <label key={a.id} className="checkbox-item">
-                  <input type="checkbox" checked={selectedAddons.includes(a.id)} onChange={() => toggleAddon(a.id)} />
-                  <span className="name">{a.name}</span>
-                  <span className="price">+ R$ {a.price.toFixed(2)}</span>
-                </label>
-              ))}
-            </div>
-          </section>
+          {isPizza && (
+            <section className="modal-section">
+              <div className="section-header">
+                <h3>Adicionais Extras</h3>
+              </div>
+              <div className="checkbox-group">
+                {addons.map(a => (
+                  <label key={a.id} className="checkbox-item">
+                    <input type="checkbox" checked={selectedAddons.includes(a.id)} onChange={() => toggleAddon(a.id)} />
+                    <span className="name">{a.name}</span>
+                    <span className="price">+ R$ {a.price.toFixed(2)}</span>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
 
-          <section className="modal-section cross-sell">
-            <div className="section-header">
-              <h3>Aproveite e leve bebidas</h3>
-            </div>
-            <div className="horizontal-scroll">
-              {fakeDrinks.map(drink => (
-                <div key={drink.id} className={`drink-card ${selectedDrinks.find(d => d.id === drink.id) ? 'selected' : ''}`} onClick={() => toggleDrink(drink)}>
-                  <img src={drink.image} alt={drink.name} />
-                  <span className="name">{drink.name}</span>
-                  <span className="price">+ R$ {drink.price.toFixed(2)}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          {isPizza && (
+            <section className="modal-section cross-sell">
+              <div className="section-header">
+                <h3>Aproveite e leve bebidas</h3>
+              </div>
+              <div className="horizontal-scroll">
+                {availableProducts
+                  .filter(p => p.categoryName?.toLowerCase().includes('bebida') || p.categoryName?.toLowerCase().includes('drink'))
+                  .map(drink => (
+                  <div key={drink.id} className={`drink-card ${selectedDrinks.find(d => d.id === drink.id) ? 'selected' : ''}`} onClick={() => toggleDrink(drink)}>
+                    <div className="drink-card-img-placeholder">🥤</div>
+                    <span className="name">{drink.name}</span>
+                    <span className="price">+ R$ {drink.price.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="modal-section">
             <div className="section-header">

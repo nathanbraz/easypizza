@@ -1,6 +1,6 @@
 import React from 'react';
 import { Plus } from 'lucide-react';
-import type { Product } from '../../pages/MenuPage/fakeData';
+import type { Product } from '../../types';
 import './ProductCard.css';
 
 interface ProductCardProps {
@@ -16,7 +16,7 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
       style={{ animationDelay: `${delay}s` }}
     >
       <div className="product-image-container">
-        <img src={product.image} alt={product.name} />
+        <img src={product.imageUrl || ''} alt={product.name} />
         <div className="price-tag">R$ {product.price.toFixed(2)}</div>
       </div>
       

@@ -1,14 +1,10 @@
 import axios from 'axios';
 
 // Base URL for the .NET backend API
-// During development, standard .NET API runs on https://localhost:7202 or http://localhost:5057
-const API_BASE_URL = 'http://localhost:5057/api';
-
+// During development, standard .NET API runs on https://localhost:5001 or http://localhost:5000
 export const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  // Use a porta fixa do backend configurada
+  baseURL: 'http://localhost:5000/api',
 });
 
 /**
