@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './ProductModal.css';
 
 import type { Product } from '../../types';
@@ -27,11 +28,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     { id: 'cheddar', name: 'Recheada com Cheddar', price: 8.00 },
   ];
   
-  const addons = [
-    { id: 'bacon', name: 'Extra Bacon', price: 5.00 },
-    { id: 'cheese', name: 'Extra Queijo', price: 4.00 },
-    { id: 'olives', name: 'Azeitonas', price: 2.00 },
-  ];
+  const addons = product.addons || [];
 
   const [size, setSize] = useState(pizzaSizes[1]); // Média
   const [crust, setCrust] = useState(crustOptions[0]);
@@ -45,10 +42,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   const isPizza = product.categoryName?.toLowerCase().includes('pizza') ?? true;
 
   // Trava o scroll da página de fundo
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = 'unset'; };
-  }, []);
+  useLockBodyScroll();
 
   const toggleAddon = (id: string) => {
     setSelectedAddons(prev => prev.includes(id) ? prev.filter(a => a !== id) : [...prev, id]);
@@ -66,8 +60,8 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     : basePrice;
     
   const addonsTotal = selectedAddons.reduce((sum, addonId) => {
-    const addon = addons.find(a => a.id === addonId);
-    return sum + (addon?.price || 0);
+    const addon = addons.find((a: any) => a.id === addonId);
+    return sum + (addon?.additionalPrice || 0);
   }, 0);
   
   const drinksTotal = selectedDrinks.reduce((sum, d) => sum + d.price, 0);
@@ -82,7 +76,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       crust,
       isHalfHalf,
       secondHalf,
-      selectedAddons,
+      selectedAddons: selectedAddons.map(id => addons.find(a => a.id === id)),
       selectedDrinks,
       observation,
       quantity,
@@ -100,13 +94,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
         </button>
         
         <div className="modal-header-image">
-          {product.imageUrl ? (
-             <img src={product.imageUrl} alt={product.name} />
-          ) : (
-             <div style={{ height: '200px', background: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <h3>{product.name}</h3>
-             </div>
-          )}
+          <img src={product.imageUrl || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : (product.categoryName?.toLowerCase().includes('bebida') || product.name.toLowerCase().includes('cola') ? 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=60' : 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=60'))} alt={product.name} />
         </div>
 
         <div className="modal-scroll-area">
@@ -186,17 +174,17 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
             </section>
           )}
 
-          {isPizza && (
+          {isPizza && addons.length > 0 && (
             <section className="modal-section">
               <div className="section-header">
                 <h3>Adicionais Extras</h3>
               </div>
               <div className="checkbox-group">
-                {addons.map(a => (
+                {addons.map((a: any) => (
                   <label key={a.id} className="checkbox-item">
                     <input type="checkbox" checked={selectedAddons.includes(a.id)} onChange={() => toggleAddon(a.id)} />
                     <span className="name">{a.name}</span>
-                    <span className="price">+ R$ {a.price.toFixed(2)}</span>
+                    <span className="price">+ R$ {a.additionalPrice.toFixed(2)}</span>
                   </label>
                 ))}
               </div>

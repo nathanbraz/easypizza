@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, Percent, MapPin, ChevronRight, ChevronLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { X, CheckCircle, Ticket, MapPin, ChevronRight, ChevronLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { api } from '../../lib/api';
+import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './CheckoutModal.css';
 
 interface CheckoutModalProps {
@@ -8,11 +9,13 @@ interface CheckoutModalProps {
   updateCart: (newCart: any[]) => void;
   availableProducts?: any[];
   tenantSlug: string;
+  storeSettings?: any;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function CheckoutModal({ cart, updateCart, availableProducts = [], tenantSlug, onClose, onSuccess }: CheckoutModalProps) {
+export default function CheckoutModal({ cart, updateCart, availableProducts = [], tenantSlug, storeSettings, onClose, onSuccess }: CheckoutModalProps) {
+  useLockBodyScroll();
   // Step 1: Carrinho, Step 2: Endereço, Step 3: Pagamento
   const [step, setStep] = useState(1);
   const [couponCode, setCouponCode] = useState('');
@@ -20,13 +23,48 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
+  // Delivery (1) or Pickup (2)
+  const [orderType, setOrderType] = useState<number>(storeSettings?.acceptingDelivery ? 1 : (storeSettings?.acceptingPickup ? 2 : 1));
+  const [paymentTypeId, setPaymentTypeId] = useState<string>('');
+  const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchPaymentTypes = async () => {
+      try {
+        const res = await api.get('/settings');
+        setPaymentTypes(res.data.paymentTypes || []);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    if (step === 3) fetchPaymentTypes();
+  }, [step]);
+
   // Formulário de Endereço
   const [cep, setCep] = useState('');
   const [address, setAddress] = useState({ street: '', number: '', neighborhood: '', city: '' });
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [locationStatus, setLocationStatus] = useState<string>('');
   
   const subTotal = cart.reduce((sum, item) => sum + item.finalPrice, 0);
-  const deliveryFee = 5.00; 
+  
+  let deliveryFee = 0;
+  if (orderType === 1) { // Delivery
+    deliveryFee = storeSettings?.deliveryFee || 0;
+    if (storeSettings?.freeDeliveryThreshold && subTotal >= storeSettings.freeDeliveryThreshold) {
+      deliveryFee = 0;
+    }
+  }
+  
   const total = Math.max(0, subTotal + deliveryFee - discountAmount);
+
+  const isStoreClosed = storeSettings && !storeSettings.isStoreOpen;
+  const doesNotMeetMinimum = storeSettings && subTotal < storeSettings.minimumOrderAmount;
+  
+  // Validation for finish button
+  const canFinishOrder = !isStoreClosed && !doesNotMeetMinimum && paymentTypeId !== '';
+
 
   // Cart Management Functions
   const updateItemQuantity = (index: number, delta: number) => {
@@ -80,13 +118,38 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
     }
   };
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode) return;
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus('Geolocalização não é suportada no seu navegador');
+      return;
+    }
+
+    setLocationStatus('Buscando...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLatitude(position.coords.latitude);
+        setLongitude(position.coords.longitude);
+        setLocationStatus('📍 Localização capturada com sucesso!');
+      },
+      () => {
+        setLocationStatus('Não foi possível capturar a localização.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      }
+    );
+  };
+
+  const handleApplyCoupon = async (codeToApply?: string, isAuto: boolean = false) => {
+    const code = codeToApply || couponCode;
+    if (!code) return;
     setCouponError('');
     setCouponSuccess('');
     
     try {
-      const response = await api.get(`/coupons/validate/${couponCode}`);
+      const response = await api.get(`/coupons/validate/${code}`);
       const coupon = response.data;
       
       let discount = 0;
@@ -98,16 +161,44 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       
       setDiscountAmount(discount);
       setCouponSuccess(`Cupom aplicado! Desconto de R$ ${discount.toFixed(2)}`);
+      if (codeToApply) setCouponCode(codeToApply);
     } catch (err: any) {
       setDiscountAmount(0);
-      setCouponError(err.response?.data?.error || 'Cupom inválido.');
+      if (isAuto) {
+        // Falha silenciosa para cupons globais que expiraram ou foram desativados
+        setCouponCode('');
+      } else {
+        setCouponError(err.response?.data?.error || 'Cupom inválido.');
+      }
     }
   };
 
+  React.useEffect(() => {
+    if (step === 3 && storeSettings?.activeGlobalCouponCode && !discountAmount && !couponError) {
+      handleApplyCoupon(storeSettings.activeGlobalCouponCode, true);
+    }
+  }, [step, storeSettings?.activeGlobalCouponCode]);
+
   const handleFinishOrder = async () => {
-    setTimeout(() => {
+    try {
+      // POST order to API
+      const orderPayload = {
+        customerId: "00000000-0000-0000-0000-000000000000", // Will be filled with logged user id later
+        customerAddressId: null, // Will be filled with address later
+        type: orderType,
+        paymentTypeId: paymentTypeId,
+        items: cart.map(item => ({
+          productId: item.baseProduct.id,
+          quantity: item.quantity,
+          unitPrice: item.finalPrice / item.quantity
+        }))
+      };
+      
+      const res = await api.post(`/orders/${tenantSlug}`, orderPayload);
       onSuccess();
-    }, 1000);
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Erro ao finalizar pedido");
+    }
   };
 
   return (
@@ -125,11 +216,27 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
              <ChevronRight size={14} color="#64748b" />
              <div className={`step ${step >= 3 ? 'active' : ''}`}>Pagamento</div>
           </div>
-          <h2>
-            {step === 1 && 'Seu Carrinho'}
-            {step === 2 && 'Onde vamos entregar?'}
-            {step === 3 && 'Finalizar Pedido'}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <h2 style={{ margin: 0 }}>
+              {step === 1 && 'Seu Carrinho'}
+              {step === 2 && 'Onde vamos entregar?'}
+              {step === 3 && 'Finalizar Pedido'}
+            </h2>
+            {step === 1 && cart.length > 0 && (
+              <button 
+                type="button" 
+                onClick={() => {
+                  if (window.confirm('Tem certeza que deseja limpar todo o seu carrinho?')) {
+                    updateCart([]);
+                    onClose();
+                  }
+                }} 
+                style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '6px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+              >
+                <Trash2 size={14} /> Limpar Sacola
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="checkout-scroll">
@@ -247,25 +354,113 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                      <input type="text" value={address.city} onChange={e => setAddress({...address, city: e.target.value})} />
                    </div>
                  </div>
-               </section>
-             </div>
+                  
+                  <div className="form-group" style={{ marginTop: '16px' }}>
+                    <button type="button" className="secondary-button" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }} onClick={handleGetLocation}>
+                      <MapPin size={18} /> Usar minha localização atual
+                    </button>
+                    {locationStatus && (
+                      <div style={{ marginTop: '8px', fontSize: '13px', color: locationStatus.includes('sucesso') ? '#22c55e' : 'var(--primary)' }}>
+                        {locationStatus}
+                      </div>
+                    )}
+                    {latitude && longitude && (
+                      <div className="map-preview" style={{ marginTop: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
+                        <iframe 
+                          width="100%" 
+                          height="200" 
+                          frameBorder="0" 
+                          scrolling="no" 
+                          marginHeight={0} 
+                          marginWidth={0} 
+                          src={`https://maps.google.com/maps?q=${latitude},${longitude}&hl=pt-BR&z=15&output=embed`}
+                        ></iframe>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
           )}
 
-          {/* STEP 3: PAGAMENTO E RESUMO */}
-          {step === 3 && (
-             <div className="step-content animate-fade-in">
+            {/* STEP 3: PAGAMENTO E RESUMO */}
+           {step === 3 && (
+              <div className="step-content animate-fade-in">
+                <section className="checkout-section">
+                  <h3>Resumo do Pedido</h3>
+                 <div style={{ background: 'rgba(255,255,255,0.02)', borderRadius: '12px', padding: '16px', border: '1px solid rgba(255,255,255,0.05)', marginBottom: '24px' }}>
+                   {cart.map((item, index) => (
+                     <div key={index} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: index < cart.length - 1 ? '1px dashed rgba(255,255,255,0.1)' : 'none' }}>
+                       <div style={{ display: 'flex', gap: '12px' }}>
+                         <span style={{ color: 'var(--primary)', fontWeight: 'bold', background: 'rgba(255, 87, 34, 0.1)', padding: '2px 8px', borderRadius: '4px', height: 'fit-content' }}>{item.quantity}x</span>
+                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                           <span style={{ fontWeight: '600', fontSize: '0.95rem' }}>{item.baseProduct.name}</span>
+                           {item.size && <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Tam: {item.size.name}</span>}
+                           {item.isHalfHalf && <span style={{ fontSize: '0.8rem', color: '#fbbf24' }}>1/2 {item.secondHalf?.name}</span>}
+                         </div>
+                       </div>
+                       <span style={{ fontWeight: 'bold' }}>R$ {item.finalPrice.toFixed(2)}</span>
+                     </div>
+                   ))}
+                 </div>
+               </section>
+
+                <section className="checkout-section">
+                  <h3>Como deseja receber?</h3>
+                  <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '6px', marginBottom: '24px' }}>
+                    {storeSettings?.acceptingDelivery && (
+                      <button 
+                        onClick={() => setOrderType(1)}
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: orderType === 1 ? 'var(--primary)' : 'transparent', color: orderType === 1 ? 'white' : '#94a3b8', fontWeight: 'bold', transition: 'all 0.2s ease' }}
+                      >
+                        Entrega Delivery
+                      </button>
+                    )}
+                    {storeSettings?.acceptingPickup && (
+                      <button 
+                        onClick={() => setOrderType(2)}
+                        style={{ flex: 1, padding: '12px', borderRadius: '8px', border: 'none', background: orderType === 2 ? 'var(--primary)' : 'transparent', color: orderType === 2 ? 'white' : '#94a3b8', fontWeight: 'bold', transition: 'all 0.2s ease' }}
+                      >
+                        Retirada no Balcão
+                      </button>
+                    )}
+                  </div>
+                </section>
+                
+                <section className="checkout-section">
+                  <h3>Forma de Pagamento</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', marginBottom: '24px' }}>
+                    {paymentTypes.filter(pt => pt.isActive).map(pt => (
+                      <button 
+                        key={pt.id}
+                        onClick={() => setPaymentTypeId(pt.id)}
+                        style={{ padding: '12px', borderRadius: '8px', border: paymentTypeId === pt.id ? '2px solid var(--primary)' : '1px solid rgba(255,255,255,0.1)', background: paymentTypeId === pt.id ? 'rgba(255, 87, 34, 0.1)' : 'rgba(255,255,255,0.02)', color: 'white', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '12px' }}
+                      >
+                        <div style={{ width: '20px', height: '20px', borderRadius: '50%', border: '2px solid', borderColor: paymentTypeId === pt.id ? 'var(--primary)' : 'rgba(255,255,255,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          {paymentTypeId === pt.id && <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--primary)' }} />}
+                        </div>
+                        {pt.name}
+                      </button>
+                    ))}
+                    {paymentTypes.filter(pt => pt.isActive).length === 0 && (
+                      <div style={{ padding: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Nenhuma forma de pagamento disponível no momento.</div>
+                    )}
+                  </div>
+                </section>
+
+
+
                <section className="checkout-section">
                  <h3>Cupom de Desconto</h3>
                  <div className="coupon-container">
                    <div className="coupon-input-wrapper">
-                     <Percent size={18} color="#94a3b8" />
+                     <Ticket size={18} color="var(--primary)" />
                      <input 
                        type="text" 
                        placeholder="Código" 
                        value={couponCode} 
                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                      />
-                     <button onClick={handleApplyCoupon}>Aplicar</button>
+                     <button onClick={() => handleApplyCoupon()}>Aplicar</button>
                    </div>
                    {couponError && <span className="coupon-msg error">{couponError}</span>}
                    {couponSuccess && <span className="coupon-msg success">{couponSuccess}</span>}
@@ -305,9 +500,15 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                <button className="secondary-button" onClick={() => setStep(2)}>
                  <ChevronLeft size={20} /> Voltar
                </button>
-               <button className="primary-button" style={{flex: 1}} onClick={handleFinishOrder}>
-                 <CheckCircle size={20} /> Finalizar Pedido
-               </button>
+                <button 
+                  className="primary-button" 
+                  style={{flex: 1, opacity: (!canFinishOrder) ? 0.5 : 1, cursor: (!canFinishOrder) ? 'not-allowed' : 'pointer'}} 
+                  onClick={handleFinishOrder}
+                  disabled={!canFinishOrder}
+                  title={isStoreClosed ? "A loja está fechada" : doesNotMeetMinimum ? `Pedido mínimo é R$ ${storeSettings?.minimumOrderAmount.toFixed(2)}` : paymentTypeId === '' ? "Selecione uma forma de pagamento" : ""}
+                >
+                  <CheckCircle size={20} /> Finalizar Pedido
+                </button>
              </div>
           )}
         </div>

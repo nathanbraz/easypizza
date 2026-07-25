@@ -14,12 +14,16 @@ import './MenuPage.css';
 
 export default function MenuPage() {
   const navigate = useNavigate();
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<any[]>(() => {
+    const savedCart = localStorage.getItem('@EasyPizza:Cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [storeSettings, setStoreSettings] = useState<any>(null);
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -65,8 +69,22 @@ export default function MenuPage() {
       }
     };
 
+    const fetchSettings = async () => {
+      try {
+        const res = await api.get('/settings');
+        setStoreSettings(res.data.storeSettings);
+      } catch (error) {
+        console.error("Erro ao buscar configuracoes da loja", error);
+      }
+    };
+
     fetchCatalog();
+    fetchSettings();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('@EasyPizza:Cart', JSON.stringify(cart));
+  }, [cart]);
 
   const handleOpenModal = (product: Product) => {
     setSelectedProduct(product);
@@ -96,12 +114,18 @@ export default function MenuPage() {
         </div>
       )}
 
+      {storeSettings?.messageOfTheDay && (
+        <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '12px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
+          {storeSettings.messageOfTheDay}
+        </div>
+      )}
+
       <header className="header glass-panel">
         <div className="header-info">
           <h1>{customerInfo ? `Olá, ${customerInfo.customerName}!` : 'EasyPizza'}</h1>
-          <div className="status-badge">
-            <span className="dot"></span>
-            Aberto agora
+          <div className="status-badge" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? 'rgba(239, 68, 68, 0.1)' : undefined, color: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}>
+            <span className="dot" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}></span>
+            {storeSettings?.isStoreOpen === false ? 'Fechado no momento' : 'Aberto agora'}
           </div>
         </div>
         <div className="header-address">
@@ -111,17 +135,19 @@ export default function MenuPage() {
       </header>
 
       <main className="menu-content">
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '50px', color: 'white' }}>Carregando cardápio...</div>
+        {categories.filter(c => c.products && c.products.length > 0).length === 0 && !loading ? (
+          <div className="empty-state">
+            <p>Nenhum produto encontrado.</p>
+          </div>
         ) : (
-          categories.map((category) => (
+          categories.filter(category => category.products && category.products.length > 0).map((category: ProductCategory) => (
             <div key={category.id || category.name}>
               <h2 className="section-title">{category.name}</h2>
               <div className="product-grid">
                 {category.products && category.products.map((product: Product, index: number) => (
                   <ProductCard 
                     key={product.id} 
-                    product={{...product, categoryName: category.name}} 
+                    product={{...product, categoryName: category.name, addons: category.addons}} 
                     onAdd={handleOpenModal} 
                     delay={index * 0.1}
                   />
@@ -149,6 +175,7 @@ export default function MenuPage() {
           updateCart={setCart}
           availableProducts={categories.flatMap(c => c.products.map(p => ({...p, categoryName: c.name})))}
           tenantSlug={getTenantSlugFromUrl()}
+          storeSettings={storeSettings}
           onClose={() => setIsCheckoutOpen(false)}
           onSuccess={handleCheckoutSuccess}
         />

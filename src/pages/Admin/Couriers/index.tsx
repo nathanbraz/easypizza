@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Edit2, Trash2, X } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import '../Catalog/Catalog.css';
 
 export default function CouriersManager() {
@@ -16,6 +17,8 @@ export default function CouriersManager() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useLockBodyScroll(isModalOpen);
 
   const loadData = async () => {
     try {

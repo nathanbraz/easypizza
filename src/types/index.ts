@@ -1,8 +1,8 @@
 export interface ProductAddon {
   id: string;
   name: string;
-  price: number;
-  isAvailable: boolean;
+  additionalPrice: number;
+  categoryId?: string;
 }
 
 export interface Product {
@@ -12,8 +12,9 @@ export interface Product {
   description: string;
   price: number;
   imageUrl: string | null;
+  imageUrls?: string[];
   isAvailable: boolean;
-  addons?: ProductAddon[];
+  addons?: ProductAddon[]; // Frontend injected
   categoryName?: string; // Optional field for UI ease
 }
 
@@ -22,4 +23,5 @@ export interface ProductCategory {
   name: string;
   displayOrder: number;
   products: Product[];
+  addons?: ProductAddon[];
 }

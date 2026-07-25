@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Edit2, Trash2, X, Image as ImageIcon } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import './Catalog.css';
 
 export default function CatalogManager() {
@@ -22,10 +23,13 @@ export default function CatalogManager() {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Estados extras para o Modal de Produto
-  const [previewImageUrl, setPreviewImageUrl] = useState<string>('');
+  const [previewImageUrls, setPreviewImageUrls] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
 
   const tenantSlug = 'easypizza';
+  
+  useLockBodyScroll(isModalOpen);
 
   const loadData = async () => {
     try {
@@ -54,7 +58,7 @@ export default function CatalogManager() {
     
     if (activeTab === 'produtos') {
       setItemPrice(item ? String(item.price) : '');
-      setPreviewImageUrl(item?.imageUrl || '');
+      setPreviewImageUrls(item?.imageUrls || []);
       setIsAvailable(item ? item.isAvailable : true);
     } else if (activeTab === 'adicionais') {
       setItemPrice(item ? String(item.additionalPrice) : '');
@@ -118,7 +122,7 @@ export default function CatalogManager() {
           description: formData.get('description'),
           price: parseFloat(itemPrice),
           categoryId: formData.get('categoryId'),
-          imageUrl: previewImageUrl,
+          imageUrls: previewImageUrls,
           isAvailable: isAvailable
         };
         if (editingItem) await api.put(`/products/${tenantSlug}/${editingItem.id}`, payload);
@@ -128,7 +132,7 @@ export default function CatalogManager() {
         const payload = {
           name: itemName,
           additionalPrice: parseFloat(itemPrice),
-          productId: formData.get('productId')
+          categoryId: formData.get('categoryId')
         };
         if (editingItem) await api.put(`/addons/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/addons/${tenantSlug}`, payload);
@@ -140,6 +144,28 @@ export default function CatalogManager() {
       setFormError('Erro ao salvar item. Verifique os dados.');
     } finally {
       setLoadingForm(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploadingImage(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setPreviewImageUrls(prev => [...prev, response.data.url]);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      alert('Erro ao fazer upload da imagem. Tente novamente.');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -232,18 +258,18 @@ export default function CatalogManager() {
                 <tr>
                   <th>Nome do Adicional</th>
                   <th>Preço Extra</th>
-                  <th>Produto Vinculado</th>
+                  <th>Categoria Vinculada</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {addons.map(a => {
-                  const prod = products.find(p => p.id === a.productId);
+                  const cat = categories.find(c => c.id === a.categoryId);
                   return (
                     <tr key={a.id}>
                       <td>{a.name}</td>
                       <td>+ R$ {a.additionalPrice?.toFixed(2)}</td>
-                      <td>{prod?.name || 'Todos'}</td>
+                      <td>{cat?.name || 'Todas'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button className="btn-icon" onClick={() => openModal(a)}><Edit2 size={16} /></button>
@@ -293,24 +319,56 @@ export default function CatalogManager() {
               {activeTab === 'produtos' && (
                 <div className="product-form-grid">
                   <div className="image-preview-container">
-                    <label style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500 }}>Imagem do Produto</label>
-                    <div className="image-preview-box">
-                      {previewImageUrl ? (
-                        <img src={previewImageUrl} alt="Preview" />
-                      ) : (
-                        <div className="placeholder">
-                          <ImageIcon size={32} opacity={0.5} />
-                          <span style={{ fontSize: '13px' }}>Sem imagem</span>
+                    <label style={{ fontSize: '14px', color: 'var(--text-muted)', fontWeight: 500, display: 'flex', justifyContent: 'space-between' }}>
+                      Fotos do Produto ({previewImageUrls.length})
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
+                      {previewImageUrls.map((url, idx) => (
+                        <div key={idx} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <img src={url} alt={`Preview ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <button type="button" onClick={() => setPreviewImageUrls(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                      {previewImageUrls.length === 0 && (
+                        <div className="placeholder" style={{ gridColumn: '1 / -1', height: '120px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed rgba(255,255,255,0.2)' }}>
+                          <ImageIcon size={32} opacity={0.5} style={{ marginBottom: '8px' }} />
+                          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Sem imagens</span>
                         </div>
                       )}
                     </div>
-                    <input 
-                      type="url" 
-                      placeholder="Cole a URL da imagem aqui" 
-                      className="form-input" 
-                      value={previewImageUrl}
-                      onChange={(e) => setPreviewImageUrl(e.target.value)}
-                    />
+                    
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <label htmlFor="image-upload" className="btn-secondary" style={{ textAlign: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        {uploadingImage ? 'Enviando...' : 'Tirar Foto ou Escolher Arquivo'}
+                      </label>
+                      <input 
+                        id="image-upload"
+                        type="file" 
+                        accept="image/*"
+                        capture="environment"
+                        onChange={handleImageUpload}
+                        style={{ display: 'none' }}
+                        disabled={uploadingImage}
+                      />
+                      <input 
+                        type="url" 
+                        placeholder="Ou cole a URL da imagem e aperte Enter" 
+                        className="form-input" 
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = e.currentTarget.value.trim();
+                            if (val) {
+                              setPreviewImageUrls(prev => [...prev, val]);
+                              e.currentTarget.value = '';
+                            }
+                          }
+                        }}
+                        style={{ marginTop: '4px' }}
+                      />
+                    </div>
                     
                     <div className="form-group" style={{ marginTop: '16px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <label style={{ margin: 0 }}>Produto Ativo no Cardápio?</label>
@@ -347,8 +405,7 @@ export default function CatalogManager() {
                           name="price" 
                           value={itemPrice}
                           onChange={e => { setItemPrice(e.target.value); if(errors.price) setErrors({...errors, price: ''}); }}
-                          className="form-input" 
-                          style={{ border: 'none', paddingLeft: 0, flex: 1, boxShadow: 'none' }} 
+                          style={{ border: 'none', padding: '10px 0', flex: 1, boxShadow: 'none', background: 'transparent', color: '#f8fafc', outline: 'none', fontSize: '15px' }} 
                         />
                       </div>
                       {errors.price && <span className="form-msg-error">{errors.price}</span>}
@@ -360,10 +417,10 @@ export default function CatalogManager() {
               {activeTab === 'adicionais' && (
                 <>
                   <div className="form-group">
-                    <label>Produto Vinculado</label>
-                    <select name="productId" defaultValue={editingItem?.productId} required className="form-input">
+                    <label>Categoria Vinculada</label>
+                    <select name="categoryId" defaultValue={editingItem?.categoryId} required className="form-input">
                       <option value="">Selecione...</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
                   <div className="form-group">
@@ -376,8 +433,7 @@ export default function CatalogManager() {
                         name="additionalPrice" 
                         value={itemPrice}
                         onChange={e => { setItemPrice(e.target.value); if(errors.price) setErrors({...errors, price: ''}); }}
-                        className="form-input" 
-                        style={{ border: 'none', paddingLeft: 0, flex: 1, boxShadow: 'none' }} 
+                        style={{ border: 'none', padding: '10px 0', flex: 1, boxShadow: 'none', background: 'transparent', color: '#f8fafc', outline: 'none', fontSize: '15px' }} 
                       />
                     </div>
                     {errors.price && <span className="form-msg-error">{errors.price}</span>}
