@@ -1,4 +1,3 @@
-import React from 'react';
 import { Plus } from 'lucide-react';
 import type { Product } from '../../types';
 import './ProductCard.css';

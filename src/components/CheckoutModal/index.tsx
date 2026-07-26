@@ -11,7 +11,7 @@ interface CheckoutModalProps {
   tenantSlug: string;
   storeSettings?: any;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (orderData?: any) => void;
 }
 
 export default function CheckoutModal({ cart, updateCart, availableProducts = [], tenantSlug, storeSettings, onClose, onSuccess }: CheckoutModalProps) {
@@ -40,11 +40,26 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
     if (step === 3) fetchPaymentTypes();
   }, [step]);
 
-  // Formulário de Endereço
-  const [cep, setCep] = useState('');
-  const [address, setAddress] = useState({ street: '', number: '', neighborhood: '', city: '' });
-  const [latitude, setLatitude] = useState<number | null>(null);
-  const [longitude, setLongitude] = useState<number | null>(null);
+  // Formulário de Endereço preenchido com endereço salvo do cliente (se houver)
+  const [customerInfo] = useState<any | null>(() => {
+    const saved = localStorage.getItem('@EasyPizza:CustomerInfo');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [cep, setCep] = useState(() => customerInfo?.defaultAddress?.zipCode || '');
+  const [address, setAddress] = useState(() => {
+    if (customerInfo?.defaultAddress) {
+      return {
+        street: customerInfo.defaultAddress.street || '',
+        number: customerInfo.defaultAddress.number || '',
+        neighborhood: customerInfo.defaultAddress.neighborhood || '',
+        city: customerInfo.defaultAddress.city || '',
+      };
+    }
+    return { street: '', number: '', neighborhood: '', city: '' };
+  });
+  const [latitude, setLatitude] = useState<number | null>(() => customerInfo?.defaultAddress?.latitude || null);
+  const [longitude, setLongitude] = useState<number | null>(() => customerInfo?.defaultAddress?.longitude || null);
   const [locationStatus, setLocationStatus] = useState<string>('');
   
   const subTotal = cart.reduce((sum, item) => sum + item.finalPrice, 0);
@@ -181,12 +196,56 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
   const handleFinishOrder = async () => {
     try {
+      const storedCustomerInfo = localStorage.getItem('@EasyPizza:CustomerInfo');
+      const parsedInfo = storedCustomerInfo ? JSON.parse(storedCustomerInfo) : null;
+      const customerId = parsedInfo?.customerId || localStorage.getItem('@EasyPizza:CustomerId');
+
+      if (!customerId) {
+        alert("Sessão de cliente não encontrada. Por favor, retorne ao WhatsApp para gerar um link de acesso.");
+        return;
+      }
+
+      let addrId = parsedInfo?.defaultAddress?.id || null;
+
+      // Se for delivery, salva/atualiza endereço do cliente
+      if (orderType === 1) {
+        if (!address.street || !address.number || !address.neighborhood) {
+          alert("Por favor, preencha a rua, número e bairro do endereço.");
+          return;
+        }
+        try {
+          const addrPayload = {
+            street: address.street,
+            number: address.number,
+            neighborhood: address.neighborhood,
+            city: address.city || 'São Paulo',
+            state: 'SP',
+            zipCode: cep || '00000000',
+            complement: '',
+            latitude: latitude,
+            longitude: longitude
+          };
+          const addrRes = await api.put(`/customers/${tenantSlug}/${customerId}/address`, addrPayload);
+          const createdAddr = addrRes.data.data || addrRes.data;
+          if (createdAddr && (createdAddr.id || createdAddr.Id)) {
+            addrId = createdAddr.id || createdAddr.Id;
+            if (parsedInfo) {
+              parsedInfo.defaultAddress = createdAddr;
+              localStorage.setItem('@EasyPizza:CustomerInfo', JSON.stringify(parsedInfo));
+            }
+          }
+        } catch (addrErr) {
+          console.error("Erro ao salvar endereço", addrErr);
+        }
+      }
+
       // POST order to API
       const orderPayload = {
-        customerId: "00000000-0000-0000-0000-000000000000", // Will be filled with logged user id later
-        customerAddressId: null, // Will be filled with address later
+        customerId: customerId,
+        customerAddressId: orderType === 1 ? addrId : null,
         type: orderType,
         paymentTypeId: paymentTypeId,
+        couponCode: couponCode || null,
         items: cart.map(item => ({
           productId: item.baseProduct.id,
           quantity: item.quantity,
@@ -195,7 +254,16 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       };
       
       const res = await api.post(`/orders/${tenantSlug}`, orderPayload);
-      onSuccess();
+      const createdOrder = res.data.data || res.data;
+      
+      if (createdOrder && (createdOrder.id || createdOrder.Id)) {
+        localStorage.setItem('@EasyPizza:LastOrderId', createdOrder.id || createdOrder.Id);
+      }
+      if (customerId) {
+        localStorage.setItem('@EasyPizza:CustomerId', customerId);
+      }
+
+      onSuccess(createdOrder);
     } catch (err: any) {
       alert(err.response?.data?.error || "Erro ao finalizar pedido");
     }

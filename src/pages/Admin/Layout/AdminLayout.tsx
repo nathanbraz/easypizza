@@ -1,4 +1,3 @@
-import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { LayoutDashboard, Pizza, Bike, Settings, LogOut } from 'lucide-react';
 import './AdminLayout.css';
@@ -13,7 +12,7 @@ export default function AdminLayout() {
         <nav className="sidebar-nav">
           <NavLink to="/admin/orders" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <LayoutDashboard size={20} />
-            <span>Pedidos (KDS)</span>
+            <span>Pedidos</span>
           </NavLink>
           <NavLink to="/admin/catalog" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Pizza size={20} />

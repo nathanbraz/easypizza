@@ -1,4 +1,3 @@
-import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MenuPage from './pages/MenuPage';
 import OrderTrackerPage from './pages/OrderTrackerPage';
@@ -19,6 +18,7 @@ function App() {
         <Route path="/:tenantSlug" element={<MenuPage />} />
         
         <Route path="/tracker" element={<OrderTrackerPage />} />
+        <Route path="/tracker/:orderId" element={<OrderTrackerPage />} />
         
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<Navigate to="orders" replace />} />
