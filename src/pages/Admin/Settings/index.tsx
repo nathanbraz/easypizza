@@ -55,6 +55,7 @@ export default function SettingsManager() {
     const formData = new FormData(e.currentTarget);
     
     const payload = {
+      ...storeSettings,
       isStoreOpen: formData.get('isStoreOpen') === 'on',
       deliveryFee: parseFloat(formData.get('deliveryFee') as string) || 0,
       minimumOrderAmount: parseFloat(formData.get('minimumOrderAmount') as string) || 0,
@@ -75,6 +76,33 @@ export default function SettingsManager() {
     } catch (error) {
       console.error(error);
       alert('Erro ao salvar configurações.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleUpdateWhatsappSettings = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    const payload = {
+      ...storeSettings,
+      whatsappBotEnabled: formData.get('whatsappBotEnabled') === 'on',
+      whatsappServerUrl: formData.get('whatsappServerUrl')?.toString() || null,
+      whatsappInstanceName: formData.get('whatsappInstanceName')?.toString() || null,
+      whatsappApiKey: formData.get('whatsappApiKey')?.toString() || null,
+      whatsappSupportPhone: formData.get('whatsappSupportPhone')?.toString() || null,
+      whatsappGreetingMessage: formData.get('whatsappGreetingMessage')?.toString() || null
+    };
+
+    try {
+      setSavingSettings(true);
+      await api.put('/settings', payload);
+      alert('Configurações do WhatsApp salvas com sucesso!');
+      loadSettings();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao salvar configurações do WhatsApp.');
     } finally {
       setSavingSettings(false);
     }
@@ -200,6 +228,7 @@ export default function SettingsManager() {
         
         <div className="catalog-tabs" style={{ marginTop: '16px' }}>
           <button className={`tab-btn ${activeTab === 'geral' ? 'active' : ''}`} onClick={() => setActiveTab('geral')}>Gerais</button>
+          <button className={`tab-btn ${activeTab === 'whatsapp' ? 'active' : ''}`} onClick={() => setActiveTab('whatsapp')}>WhatsApp & Robô</button>
           <button className={`tab-btn ${activeTab === 'cupons' ? 'active' : ''}`} onClick={() => setActiveTab('cupons')}>Cupons</button>
         </div>
       </header>
@@ -308,6 +337,148 @@ export default function SettingsManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'whatsapp' && storeSettings && (
+        <form className="settings-grid" onSubmit={handleUpdateWhatsappSettings} style={{ marginTop: '24px' }}>
+          {/* Card 1: Status da Conexão */}
+          <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Status do Robô de WhatsApp</h3>
+                <p className="setting-desc" style={{ margin: '4px 0 0 0' }}>Gerencie a conexão de atendimento automático (Evolution API / Z-API)</p>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                <span className={`status-badge ${storeSettings.whatsappBotEnabled ? 'status-connected' : 'status-disconnected'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold', fontSize: '13px', backgroundColor: storeSettings.whatsappBotEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)', color: storeSettings.whatsappBotEnabled ? '#22c55e' : '#ef4444', border: `1px solid ${storeSettings.whatsappBotEnabled ? '#22c55e44' : '#ef444444'}` }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: storeSettings.whatsappBotEnabled ? '#22c55e' : '#ef4444' }}></span>
+                  {storeSettings.whatsappBotEnabled ? 'Robô Ativo' : 'Robô Desativado'}
+                </span>
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 18px', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                  onClick={() => alert('Para vincular o número, certifique-se de que a instância do Evolution API está rodando no servidor e clique em OK para gerar o QR Code.')}
+                >
+                  Conectar / Gerar QR Code
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginTop: '24px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Ativar Atendimento Automático</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+                  <label className="toggle-switch">
+                    <input type="checkbox" name="whatsappBotEnabled" defaultChecked={storeSettings.whatsappBotEnabled} />
+                    <span className="slider"></span>
+                  </label>
+                  <span className="setting-desc">Ligue ou desligue as respostas do robô no número da loja</span>
+                </div>
+              </div>
+
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Número de Suporte (Transbordo Humano)</label>
+                <input 
+                  type="text" 
+                  name="whatsappSupportPhone" 
+                  defaultValue={storeSettings.whatsappSupportPhone || ''} 
+                  placeholder="Ex: 5511999999999" 
+                  className="form-input"
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+                <span className="setting-desc" style={{ marginTop: '6px' }}>Número para o qual o cliente é direcionado se escolher a Opção 2</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Mensagens Automáticas */}
+          <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
+            <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Mensagem de Boas-Vindas & Cardápio Interativo</h3>
+            <p className="setting-desc" style={{ margin: '4px 0 16px 0' }}>Mensagem enviada automaticamente quando o cliente envia um "Oi" ou manda mensagem pela primeira vez.</p>
+            
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+              <textarea 
+                name="whatsappGreetingMessage" 
+                defaultValue={storeSettings.whatsappGreetingMessage || ''} 
+                rows={5} 
+                style={{ width: '100%', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white', fontFamily: 'inherit', fontSize: '14px', resize: 'vertical', lineHeight: '1.5' }}
+                placeholder="Olá! Bem-vindo(a)... Digite 1 para Cardápio ou 2 para Atendente"
+              />
+            </div>
+          </div>
+
+          {/* Card 3: Credenciais e Webhook */}
+          <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Credenciais do Servidor de Bot & Webhook</h3>
+                <p className="setting-desc" style={{ margin: '4px 0 0 0' }}>Configurações técnicas para o motor Evolution API / Z-API</p>
+              </div>
+              <button type="submit" className="btn-primary" disabled={savingSettings} style={{ padding: '12px 24px', fontWeight: 'bold' }}>
+                {savingSettings ? 'Salvando...' : 'Salvar Alterações de WhatsApp'}
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>URL do Servidor do Robô</label>
+                <input 
+                  type="text" 
+                  name="whatsappServerUrl" 
+                  defaultValue={storeSettings.whatsappServerUrl || ''} 
+                  placeholder="Ex: http://localhost:8080 ou https://bot.suaempresa.com" 
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+              </div>
+
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Nome da Instância / ID da Loja</label>
+                <input 
+                  type="text" 
+                  name="whatsappInstanceName" 
+                  defaultValue={storeSettings.whatsappInstanceName || ''} 
+                  placeholder="Ex: pizzariabrazil" 
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+              </div>
+
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>API Key / Token de Segurança</label>
+                <input 
+                  type="password" 
+                  name="whatsappApiKey" 
+                  defaultValue={storeSettings.whatsappApiKey || ''} 
+                  placeholder="Cole sua API Key do Evolution ou Z-API aqui" 
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ marginTop: '28px', padding: '18px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px dashed rgba(255, 255, 255, 0.2)' }}>
+              <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>URL do Webhook do EasyPizza (Somente Leitura)</label>
+              <p className="setting-desc" style={{ margin: '6px 0 14px 0', fontSize: '13px' }}>Configure esta URL no seu painel ou motor de WhatsApp para que o sistema receba mensagens automaticamente.</p>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input 
+                  type="text" 
+                  readOnly 
+                  value="http://localhost:5000/api/webhook/whatsapp/pizzariabrazil" 
+                  style={{ flex: 1, minWidth: '250px', padding: '12px 14px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: '#cbd5e1', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}
+                />
+                <button 
+                  type="button" 
+                  className="btn-secondary" 
+                  style={{ whiteSpace: 'nowrap', padding: '12px 18px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText('http://localhost:5000/api/webhook/whatsapp/pizzariabrazil');
+                    alert('URL do Webhook copiada com sucesso para a área de transferência!');
+                  }}
+                >
+                  Copiar Link
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
       )}
 
       {activeTab === 'cupons' && (
