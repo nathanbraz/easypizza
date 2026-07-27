@@ -108,7 +108,7 @@ export default function OrderTrackerPage() {
         </button>
         <div className="tracker-header-info" style={{ flex: 1 }}>
           <h1>Acompanhar Pedido</h1>
-          {order && <span className="order-number">#{order.id.slice(0, 8).toUpperCase()}</span>}
+          {order && <span className="order-number">#{order.id}</span>}
         </div>
         <button 
           className="back-btn" 
@@ -253,7 +253,7 @@ export default function OrderTrackerPage() {
                 <div key={ord.id} className="history-card">
                   <div className="history-info">
                     <h4>
-                      Pedido #{ord.id.slice(0, 8).toUpperCase()}
+                      Pedido #{ord.id}
                       <span className={`history-badge status-${ord.status}`}>
                         {getStatusLabel(Number(ord.status))}
                       </span>
