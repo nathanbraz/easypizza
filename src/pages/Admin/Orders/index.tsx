@@ -45,7 +45,6 @@ export default function OrdersDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [openMenuOrderId, setOpenMenuOrderId] = useState<string | number | null>(null);
 
   const fetchOrders = async () => {
     try {
@@ -285,7 +284,11 @@ export default function OrdersDashboard() {
             <div 
               key={col.id} 
               className="kanban-column glass-panel"
-              style={{ borderTop: `3px solid ${col.color}`, boxShadow: `0 -4px 20px -10px ${col.color}` }}
+              style={{ 
+                borderTop: `3px solid ${col.color}`, 
+                boxShadow: `0 -4px 20px -10px ${col.color}`,
+                '--col-color': col.color 
+              } as React.CSSProperties}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add('drag-over');
@@ -319,7 +322,7 @@ export default function OrdersDashboard() {
               </div>
               <div className="kanban-cards">
                 {colOrders.length === 0 ? (
-                  <div className="empty-column" style={{ borderColor: `${col.color}25` }}>
+                  <div className="empty-column">
                     <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: `${col.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: col.color, opacity: 0.7 }}>
                       <Inbox size={18} />
                     </div>
@@ -327,10 +330,10 @@ export default function OrdersDashboard() {
                   </div>
                 ) : (
                   colOrders.map(order => (
-                    <div 
-                      key={order.id} 
-                      className="order-card animate-scale-up"
-                      style={{ borderLeft: `3px solid ${col.color}` }}
+                      <div 
+                        key={order.id} 
+                        className="order-card animate-scale-up"
+                        style={{ '--col-color': col.color } as React.CSSProperties}
                       draggable={true}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', String(order.id));
@@ -349,30 +352,22 @@ export default function OrdersDashboard() {
                       <div className="order-footer">
                         <span className="order-total">R$ {(order.totalAmount ?? order.subTotal ?? 0).toFixed(2)}</span>
                         <div className="order-actions">
-                          {col.id === 'new' && <button className="btn-action" onClick={() => moveOrder(order.id, 2)}>Preparar</button>}
-                          {col.id === 'preparing' && <button className="btn-action" onClick={() => moveOrder(order.id, 3)}>Entregar</button>}
-                          {col.id === 'delivering' && <button className="btn-action" onClick={() => moveOrder(order.id, 4)}>Concluir</button>}
                           <button 
                             className="btn-icon" 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setOpenMenuOrderId(openMenuOrderId === order.id ? null : order.id);
-                            }} 
-                            title="Opções do Pedido"
+                            onClick={() => setSelectedOrder(order)} 
+                            title="Detalhes do Pedido"
+                            style={{ color: 'var(--text-main)' }}
                           >
-                            <MoreVertical size={16} />
+                            <Eye size={18} />
                           </button>
-
-                          {openMenuOrderId === order.id && (
-                            <div className="order-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => { setOpenMenuOrderId(null); setSelectedOrder(order); }}>
-                                <Eye size={14} /> Detalhes do Pedido
-                              </button>
-                              <button onClick={() => { setOpenMenuOrderId(null); printOrderTicket(order); }}>
-                                <Printer size={14} /> Imprimir Pedido
-                              </button>
-                            </div>
-                          )}
+                          <button 
+                            className="btn-icon" 
+                            onClick={() => printOrderTicket(order)} 
+                            title="Imprimir Pedido"
+                            style={{ color: 'var(--text-main)' }}
+                          >
+                            <Printer size={18} />
+                          </button>
                         </div>
                       </div>
                     </div>
