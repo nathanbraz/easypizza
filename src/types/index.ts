@@ -14,8 +14,8 @@ export interface Product {
   imageUrl: string | null;
   imageUrls?: string[];
   isAvailable: boolean;
-  addons?: ProductAddon[]; // Frontend injected
-  categoryName?: string; // Optional field for UI ease
+  addons?: ProductAddon[]; // Injetado pelo frontend
+  categoryName?: string; // Campo opcional para facilitar a UI
 }
 
 export interface ProductCategory {

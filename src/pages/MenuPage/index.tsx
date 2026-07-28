@@ -7,7 +7,7 @@ import CheckoutModal from '../../components/CheckoutModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
-// Fallback for types or when API fails:
+// Fallback para tipagem ou quando a API falhar:
 import { fakeProducts, fakeDrinks } from './fakeData';
 import type { Product, ProductCategory } from '../../types';
 import './MenuPage.css';
@@ -54,7 +54,7 @@ export default function MenuPage() {
             setSessionChecking(false);
             return;
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Token inválido ou expirado", error);
         }
       }
@@ -69,13 +69,12 @@ export default function MenuPage() {
     const fetchCatalog = async () => {
       try {
         const slug = getTenantSlugFromUrl();
-        // Calls GET http://localhost:5000/api/menu/{slug}
+        // Chama GET http://localhost:5000/api/menu/{slug}
         const response = await api.get(`/menu/${slug}`);
         setCategories(response.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao buscar cardápio, usando dados falsos...", error);
-        // Fallback for UI visualization before the database has products
-        // Fallback for UI visualization before the database has products
+        // Fallback para visualização na UI antes do banco de dados ter produtos
         setCategories([
           { id: 'fake-cat-1', name: 'Pizzas Tradicionais', displayOrder: 1, products: fakeProducts } as ProductCategory,
           { id: 'fake-cat-2', name: 'Bebidas', displayOrder: 2, products: fakeDrinks } as ProductCategory
@@ -89,7 +88,7 @@ export default function MenuPage() {
       try {
         const res = await api.get('/settings');
         setStoreSettings(res.data.storeSettings);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Erro ao buscar configuracoes da loja", error);
       }
     };
@@ -128,6 +127,8 @@ export default function MenuPage() {
       </div>
     );
   }
+
+
 
   if (sessionValid === false) {
     const waNumber = storeSettings?.whatsAppNumber || '5511999999999';

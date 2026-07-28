@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import MenuPage from './pages/MenuPage';
 import OrderTrackerPage from './pages/OrderTrackerPage';
 
@@ -16,6 +17,13 @@ import './index.css';
 
 function App() {
   const superAdmin = isSuperAdmin();
+  const [tenantNotFound, setTenantNotFound] = useState(false);
+
+  useEffect(() => {
+    const handleNotFound = () => setTenantNotFound(true);
+    window.addEventListener('tenant-not-found', handleNotFound);
+    return () => window.removeEventListener('tenant-not-found', handleNotFound);
+  }, []);
 
   if (superAdmin) {
     return (
@@ -31,14 +39,24 @@ function App() {
     );
   }
 
+  if (tenantNotFound) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#0f1115', textAlign: 'center', padding: '2rem' }}>
+        <h1 style={{ color: '#ff4d4d', marginBottom: '1rem', fontSize: '2.5rem' }}>Loja Não Encontrada</h1>
+        <p style={{ color: '#a0aabf', fontSize: '1.1rem' }}>O endereço que você acessou não corresponde a uma loja ativa em nosso sistema.</p>
+        <p style={{ color: '#a0aabf', marginTop: '0.5rem' }}>Verifique se a URL/Subdomínio está correto ou entre em contato com o estabelecimento.</p>
+      </div>
+    );
+  }
+
   return (
     <BrowserRouter>
       <Routes>
-        {/* Subdomain Root Route (e.g. pizzatop.lvh.me / pizzariabrazil.lvh.me) */}
+        {/* Rota Raiz por Subdomínio (ex: pizzatop.lvh.me / pizzariabrazil.lvh.me) */}
         <Route path="/" element={<MenuPage />} />
         <Route path="/pedido" element={<MenuPage />} />
         
-        {/* Legacy Path Fallback Route for localhost without subdomains (e.g. localhost:3333/pizzariabrazil) */}
+        {/* Rota de Fallback para localhost sem subdomínios (ex: localhost:3333/pizzariabrazil) */}
         <Route path="/:tenantSlug" element={<MenuPage />} />
         <Route path="/:tenantSlug/pedido" element={<MenuPage />} />
         

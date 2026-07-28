@@ -21,7 +21,7 @@ export default function TenantsDashboard() {
   const [migratingSlug, setMigratingSlug] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Form State
+  // Estado do Formulário
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [connectionString, setConnectionString] = useState('');
@@ -48,10 +48,10 @@ export default function TenantsDashboard() {
 
   const handleNameChange = (val: string) => {
     setName(val);
-    // Auto-suggest slug from name
+    // Sugerir slug automaticamente a partir do nome
     const autoSlug = val.toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // remove accents
-      .replace(/[^a-z0-9]/g, ""); // remove spaces and special chars
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, "") // remove acentos
+      .replace(/[^a-z0-9]/g, ""); // remove espaços e caracteres especiais
     setSlug(autoSlug);
   };
 
@@ -105,18 +105,18 @@ export default function TenantsDashboard() {
     const hostname = window.location.hostname;
     const port = window.location.port ? `:${window.location.port}` : '';
     
-    // If local lvh.me or localhost
+    // Se for ambiente local lvh.me ou localhost
     if (hostname.includes('lvh.me') || hostname === 'localhost') {
       return `http://${tenantSlug}.lvh.me${port}${path}`;
     }
     
-    // Production cloudflare/vercel
+    // Produção cloudflare/vercel
     if (hostname.includes('.')) {
       const baseDomain = hostname.substring(hostname.indexOf('.') + 1);
       return `${window.location.protocol}//${tenantSlug}.${baseDomain}${path}`;
     }
     
-    // Fallback
+    // Fallback padrão
     return `http://${tenantSlug}.lvh.me${port}${path}`;
   };
 

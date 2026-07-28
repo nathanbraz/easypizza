@@ -9,12 +9,12 @@ import './Settings.css';
 export default function SettingsManager() {
   const [activeTab, setActiveTab] = useState('geral');
   
-  // Settings State
+  // Estado das Configurações
   const [storeSettings, setStoreSettings] = useState<any>(null);
   const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Coupons State
+  // Estado dos Cupons
   const [coupons, setCoupons] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<any>(null);
@@ -167,18 +167,18 @@ export default function SettingsManager() {
         await api.post('/coupons', payload);
       }
 
-      // Handle Global Coupon setting
+      // Lidar com a configuração de Cupom Global
       const isGlobal = formData.get('isGlobal') === 'on';
       const currentGlobalCode = storeSettings?.activeGlobalCouponCode;
       
       if (isGlobal && currentGlobalCode !== code) {
-        // Set this coupon as global
+        // Define este cupom como global
         await api.put('/settings', {
           ...storeSettings,
           activeGlobalCouponCode: code
         });
       } else if (!isGlobal && currentGlobalCode === code) {
-        // Remove this coupon from global
+        // Remove este cupom do global
         await api.put('/settings', {
           ...storeSettings,
           activeGlobalCouponCode: null
@@ -187,7 +187,7 @@ export default function SettingsManager() {
 
       closeCouponModal();
       loadCoupons();
-      loadSettings(); // Reload settings to get updated global coupon
+      loadSettings(); // Recarrega as configurações para atualizar o cupom global
     } catch (error: any) {
       console.error(error);
       setFormError(error.response?.data?.error || error.response?.data || 'Erro ao salvar cupom.');

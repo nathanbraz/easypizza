@@ -17,7 +17,7 @@ export default function CatalogManager() {
   const [loadingForm, setLoadingForm] = useState(false);
   const [formError, setFormError] = useState<string>('');
   
-  // Validation States
+  // Estados de Validação
   const [itemName, setItemName] = useState('');
   const [itemPrice, setItemPrice] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});

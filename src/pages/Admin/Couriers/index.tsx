@@ -12,7 +12,7 @@ export default function CouriersManager() {
   const [loadingForm, setLoadingForm] = useState(false);
   const [formError, setFormError] = useState<string>('');
   
-  // Validation state
+  // Estados de Validação
   const [name, setName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [vehiclePlate, setVehiclePlate] = useState('');
@@ -60,7 +60,7 @@ export default function CouriersManager() {
   };
 
   const handlePhoneChange = (val: string) => {
-    // Simple mask for numbers only
+    // Máscara simples apenas para números
     const digits = val.replace(/\D/g, '');
     setPhoneNumber(digits);
     if(errors.phoneNumber) setErrors({...errors, phoneNumber: ''});
@@ -75,7 +75,7 @@ export default function CouriersManager() {
     e.preventDefault();
     setFormError('');
     
-    // Validations
+    // Validações
     let newErrors: Record<string, string> = {};
     if (!name.trim()) newErrors.name = 'O nome é obrigatório';
     if (!phoneNumber.trim()) newErrors.phoneNumber = 'O telefone é obrigatório';
