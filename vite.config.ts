@@ -7,5 +7,7 @@ export default defineConfig({
   server: {
     port: 3333,
     strictPort: true,
+    host: true, // Permite conexões via 0.0.0.0 / lvh.me
+    allowedHosts: true, // Obrigatório no Vite 6+ para permitir hostnames customizados como .lvh.me
   },
 })

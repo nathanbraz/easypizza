@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { MoreVertical, RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer } from 'lucide-react';
+import { MoreVertical, RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import './Orders.css';
 
@@ -162,14 +162,14 @@ export default function OrdersDashboard() {
         <title>Imprimir Pedido #${order.id}</title>
         <style>
           @page {
-            margin: 0;
-            size: 80mm auto;
+            margin: 4mm;
+            size: auto;
           }
           body {
             font-family: 'Courier New', Courier, monospace;
-            width: 72mm;
+            max-width: 76mm;
             margin: 0 auto;
-            padding: 4mm 2mm;
+            padding: 2mm;
             color: #000;
             background: #fff;
             font-size: 12px;
@@ -235,12 +235,12 @@ export default function OrdersDashboard() {
         <div class="divider"></div>
         <div class="text-center" style="margin-top: 8px; font-size: 11px;">*** OBRIGADO PELA PREFERÊNCIA! ***</div>
         <div class="text-center" style="font-size: 10px; margin-top: 2px;">Sistema EasyPizza</div>
-        <div style="height: 15mm;"></div>
+        <div style="height: 4mm;"></div>
       </body>
       </html>
     `;
 
-    const printWin = window.open('', '_blank', 'width=350,height=600');
+    const printWin = window.open('', '_blank', 'width=900,height=800,left=150,top=80');
     if (printWin) {
       printWin.document.open();
       printWin.document.write(ticketHtml);
@@ -253,11 +253,11 @@ export default function OrdersDashboard() {
     }
   };
 
-  const columns: { id: ColumnStatus; title: string }[] = [
-    { id: 'new', title: 'Novos' },
-    { id: 'preparing', title: 'Preparando' },
-    { id: 'delivering', title: 'Em Entrega' },
-    { id: 'done', title: 'Finalizados' }
+  const columns: { id: ColumnStatus; title: string; color: string }[] = [
+    { id: 'new', title: 'Novos', color: '#f97316' },
+    { id: 'preparing', title: 'Preparando', color: '#3b82f6' },
+    { id: 'delivering', title: 'Em Entrega', color: '#06b6d4' },
+    { id: 'done', title: 'Finalizados', color: '#22c55e' }
   ];
 
   return (
@@ -285,6 +285,7 @@ export default function OrdersDashboard() {
             <div 
               key={col.id} 
               className="kanban-column glass-panel"
+              style={{ borderTop: `3px solid ${col.color}`, boxShadow: `0 -4px 20px -10px ${col.color}` }}
               onDragOver={(e) => {
                 e.preventDefault();
                 e.currentTarget.classList.add('drag-over');
@@ -310,17 +311,26 @@ export default function OrdersDashboard() {
               }}
             >
               <div className="kanban-column-header">
-                <h3>{col.title}</h3>
-                <span className="kanban-badge">{colOrders.length}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: col.color, boxShadow: `0 0 8px ${col.color}` }}></span>
+                  <h3 style={{ color: col.id === 'new' ? '#ffedd5' : 'var(--text-main)' }}>{col.title}</h3>
+                </div>
+                <span className="kanban-badge" style={{ backgroundColor: `${col.color}20`, color: col.color, border: `1px solid ${col.color}40` }}>{colOrders.length}</span>
               </div>
               <div className="kanban-cards">
                 {colOrders.length === 0 ? (
-                  <div className="empty-column">Nenhum pedido nesta etapa</div>
+                  <div className="empty-column" style={{ borderColor: `${col.color}25` }}>
+                    <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: `${col.color}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: col.color, opacity: 0.7 }}>
+                      <Inbox size={18} />
+                    </div>
+                    <span>Nenhum pedido nesta etapa</span>
+                  </div>
                 ) : (
                   colOrders.map(order => (
                     <div 
                       key={order.id} 
                       className="order-card animate-scale-up"
+                      style={{ borderLeft: `3px solid ${col.color}` }}
                       draggable={true}
                       onDragStart={(e) => {
                         e.dataTransfer.setData('text/plain', String(order.id));

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, MessageCircle, ListOrdered, Zap } from 'lucide-react';
+import { MapPin, MessageCircle, ListOrdered, Zap, RotateCcw } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import Cart from '../../components/Cart';
 import ProductModal from '../../components/ProductModal';
@@ -183,18 +183,6 @@ export default function MenuPage() {
 
   return (
     <div className="menu-page">
-      {customerInfo?.lastOrderSummary && (
-        <div className="reorder-banner glass-panel animate-slide-up">
-          <div className="reorder-info">
-            <h3>Refazer Último Pedido?</h3>
-            <p>{customerInfo.lastOrderSummary}</p>
-          </div>
-          <button className="primary-button reorder-btn">
-            Pedir Novamente
-          </button>
-        </div>
-      )}
-
       {storeSettings?.messageOfTheDay && (
         <div style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', padding: '12px', textAlign: 'center', fontWeight: 'bold', fontSize: '14px', borderBottom: '1px solid rgba(239,68,68,0.2)' }}>
           {storeSettings.messageOfTheDay}
@@ -224,6 +212,26 @@ export default function MenuPage() {
       </header>
 
       <main className="menu-content">
+        {customerInfo?.lastOrderSummary && (
+          <div className="reorder-card glass-panel animate-slide-up">
+            <div className="reorder-card-left">
+              <div className="reorder-icon-wrapper">
+                <RotateCcw size={20} />
+              </div>
+              <div className="reorder-info">
+                <h3>Quer pedir de novo? 🍕</h3>
+                <p>{customerInfo.lastOrderSummary}</p>
+              </div>
+            </div>
+            <button 
+              className="reorder-action-btn"
+              onClick={() => navigate(customerInfo.lastOrderId ? `/tracker/${customerInfo.lastOrderId}` : '/tracker')}
+            >
+              Pedir Novamente
+            </button>
+          </div>
+        )}
+
         {categories.filter(c => c.products && c.products.length > 0).length === 0 && !loading ? (
           <div className="empty-state">
             <p>Nenhum produto encontrado.</p>
@@ -247,7 +255,7 @@ export default function MenuPage() {
         )}
       </main>
 
-      {cart.length > 0 && <Cart items={cart} onCheckout={() => setIsCheckoutOpen(true)} />}
+      {!isCheckoutOpen && !selectedProduct && cart.length > 0 && <Cart items={cart} onCheckout={() => setIsCheckoutOpen(true)} />}
 
       {selectedProduct && (
         <ProductModal 

@@ -228,14 +228,16 @@
 
 /* Modal Wide para Produtos */
 .modal-wide {
-  width: 760px !important;
-  max-width: 95vw;
+  width: 780px !important;
+  max-width: 95vw !important;
 }
 
 .product-form-grid {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: minmax(240px, 280px) 1fr;
   gap: 24px;
+  align-items: start;
+  width: 100%;
 }
 
 @media (max-width: 768px) {

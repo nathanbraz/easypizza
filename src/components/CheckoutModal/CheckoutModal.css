@@ -228,9 +228,10 @@
   left: 16px;
   color: var(--text-muted);
 }
-.input-with-icon input {
+.input-with-icon input,
+.form-group .input-with-icon input {
   width: 100%;
-  padding-left: 44px;
+  padding-left: 44px !important;
 }
 
 /* Rich Cart Styles */

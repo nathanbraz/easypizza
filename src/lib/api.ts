@@ -8,18 +8,50 @@ export const api = axios.create({
 });
 
 /**
- * Extracts the Tenant Slug from the URL.
- * Example: For easypizza.com/pizzariabrazil/menu, it extracts "pizzariabrazil"
- * For local testing: http://localhost:3333/pizzariabrazil returns "pizzariabrazil"
+ * Verifies if the current host or URL is the SuperAdmin dashboard.
+ * Supports admin.easypizza.com.br, admin.lvh.me, or localhost/superadmin fallback.
+ */
+export const isSuperAdmin = (): boolean => {
+  const hostname = window.location.hostname;
+  return hostname.startsWith('admin.') || 
+         hostname === 'admin.localhost' || 
+         window.location.pathname.startsWith('/superadmin');
+};
+
+/**
+ * Extracts the Tenant Slug from the URL hostname (subdomain).
+ * Example: For pizzatop.lvh.me:3333, returns "pizzatop".
+ * For local testing fallback without subdomain, checks pathname or defaults to "pizzariabrazil".
  */
 export const getTenantSlugFromUrl = (): string => {
-  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  const hostname = window.location.hostname; // e.g. "pizzatop.lvh.me" or "pizzatop.easypizza.com.br"
   
-  // We assume the first path segment is ALWAYS the tenant slug, unless it's a generic landing page
-  if (pathParts.length > 0) {
+  if (hostname.includes('.')) {
+    const parts = hostname.split('.');
+    // Avoid returning www, api, localhost, or admin as a pizzeria slug
+    if (parts[0] !== 'www' && parts[0] !== 'localhost' && parts[0] != 'api' && parts[0] !== 'admin' && parts[0] !== 'superadmin') {
+      return parts[0];
+    }
+  }
+  
+  // Path fallback for localhost development without subdomain (e.g. localhost:3333/pizzariabrazil)
+  const pathParts = window.location.pathname.split('/').filter(Boolean);
+  if (pathParts.length > 0 && pathParts[0] !== 'admin' && pathParts[0] !== 'superadmin' && pathParts[0] !== 'tracker') {
       return pathParts[0]; 
   }
   
-  // Fallback for development if no slug is provided
+  // Fallback default tenant for dev
   return 'pizzariabrazil'; 
 };
+
+// Request interceptor to automatically attach X-Tenant-Slug header to every request
+api.interceptors.request.use((config) => {
+  if (!isSuperAdmin()) {
+    const slug = getTenantSlugFromUrl();
+    if (slug) {
+      config.headers['X-Tenant-Slug'] = slug;
+    }
+  }
+  return config;
+});
+

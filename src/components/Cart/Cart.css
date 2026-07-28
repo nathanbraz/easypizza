@@ -15,6 +15,11 @@
   backdrop-filter: none !important;
 }
 
+body:has(.modal-overlay) .cart-floating {
+  display: none !important;
+}
+
+
 .cart-info {
   display: flex;
   align-items: center;

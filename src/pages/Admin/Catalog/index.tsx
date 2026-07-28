@@ -287,7 +287,7 @@ export default function CatalogManager() {
 
       {isModalOpen && createPortal(
         <div className="modal-overlay">
-          <div className={`modal-content glass-panel ${activeTab === 'produtos' ? 'modal-wide' : ''}`} style={{ width: '400px', padding: '24px', height: 'fit-content' }}>
+          <div className={`modal-content glass-panel ${activeTab === 'produtos' ? 'modal-wide' : ''}`} style={{ width: activeTab === 'produtos' ? '780px' : '460px', maxWidth: '95vw', padding: '28px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <h2>{editingItem ? 'Editar' : (activeTab === 'categorias' ? 'Nova' : 'Novo')} {activeTab === 'categorias' ? 'Categoria' : activeTab === 'adicionais' ? 'Adicional' : 'Produto'}</h2>
               <button className="btn-icon" onClick={closeModal} type="button"><X size={24} /></button>
