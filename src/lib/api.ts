@@ -63,9 +63,14 @@ api.interceptors.response.use(
     const data = error.response?.data;
     const msg = typeof data === 'string' ? data : data?.message;
     
-    if (error.response?.status === 400 && msg && msg.includes('Tenant')) {
-      console.error("[SaaS] Tenant não encontrado. Disparando evento global...");
+    if (error.response?.status === 400 && msg && (msg.includes('Tenant') || msg.includes('Empresa') || msg.includes('SaaS'))) {
+      console.error("[SaaS] Empresa/Tenant não encontrado. Disparando evento global...");
       window.dispatchEvent(new Event('tenant-not-found'));
+    }
+
+    if (error.response?.status === 403 && msg && msg.includes('TenantSuspended')) {
+      console.error("[SaaS] Tenant suspenso por inadimplência. Disparando evento global...");
+      window.dispatchEvent(new Event('tenant-suspended'));
     }
     return Promise.reject(error);
   }

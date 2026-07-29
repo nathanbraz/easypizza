@@ -1,8 +1,23 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { LayoutDashboard, Pizza, Bike, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Pizza, Bike, Settings, LogOut, Megaphone } from 'lucide-react';
+import { api } from '../../../lib/api';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
+  const [globalMsg, setGlobalMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Busca avisos globais do SaaS
+    api.get('/superadmin/dashboard/settings')
+      .then(res => {
+        if (res.data?.data?.isAnnouncementActive && res.data.data.globalAnnouncementMessage) {
+          setGlobalMsg(res.data.data.globalAnnouncementMessage);
+        }
+      })
+      .catch(err => console.error("Erro ao buscar avisos globais:", err));
+  }, []);
+
   return (
     <div className="admin-container">
       <aside className="admin-sidebar glass-panel">
@@ -35,7 +50,13 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      <main className="admin-content">
+      <main className="admin-content" style={{ display: 'flex', flexDirection: 'column' }}>
+        {globalMsg && (
+          <div className="global-announcement" style={{ backgroundColor: '#ffca28', color: '#333', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'bold', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(255, 202, 40, 0.2)' }}>
+            <Megaphone size={18} />
+            <span>{globalMsg}</span>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

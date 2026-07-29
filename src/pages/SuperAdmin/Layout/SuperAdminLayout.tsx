@@ -17,9 +17,13 @@ export default function SuperAdminLayout() {
         </div>
         
         <nav className="superadmin-nav">
-          <NavLink to="/" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/" end className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <ShieldAlert size={20} />
+            <span>Dashboard</span>
+          </NavLink>
+          <NavLink to="/tenants" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Building2 size={20} />
-            <span>Pizzarias (Tenants)</span>
+            <span>Empresas (Tenants)</span>
           </NavLink>
           <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Settings size={20} />
@@ -38,8 +42,6 @@ export default function SuperAdminLayout() {
       <main className="superadmin-content">
         <header className="superadmin-topbar">
           <div className="topbar-info">
-            <h3>Painel de Controle Principal do SaaS</h3>
-            <p>Gerencie empresas, bancos de dados isolados e assinaturas do sistema.</p>
           </div>
           <div className="topbar-actions">
             <div className="status-pill online">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Edit2, Trash2, X, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import './Catalog.css';
@@ -26,6 +26,10 @@ export default function CatalogManager() {
   const [previewImageUrls, setPreviewImageUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
+
+  // Estados extras para Adicionais
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const tenantSlug = 'easypizza';
   
@@ -62,6 +66,7 @@ export default function CatalogManager() {
       setIsAvailable(item ? item.isAvailable : true);
     } else if (activeTab === 'adicionais') {
       setItemPrice(item ? String(item.additionalPrice) : '');
+      setSelectedCategoryIds(item?.categoryIds || []);
     }
     
     setIsModalOpen(true);
@@ -132,7 +137,7 @@ export default function CatalogManager() {
         const payload = {
           name: itemName,
           additionalPrice: parseFloat(itemPrice),
-          categoryId: formData.get('categoryId')
+          categoryIds: selectedCategoryIds
         };
         if (editingItem) await api.put(`/addons/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/addons/${tenantSlug}`, payload);
@@ -269,7 +274,7 @@ export default function CatalogManager() {
                     <tr key={a.id}>
                       <td>{a.name}</td>
                       <td>+ R$ {a.additionalPrice?.toFixed(2)}</td>
-                      <td>{cat?.name || 'Todas'}</td>
+                      <td>{a.categoryIds?.length > 0 ? `${a.categoryIds.length} vinculada(s)` : 'Nenhuma (Inativo)'}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button className="btn-icon" onClick={() => openModal(a)}><Edit2 size={16} /></button>
@@ -287,7 +292,7 @@ export default function CatalogManager() {
 
       {isModalOpen && createPortal(
         <div className="modal-overlay">
-          <div className={`modal-content glass-panel ${activeTab === 'produtos' ? 'modal-wide' : ''}`} style={{ width: activeTab === 'produtos' ? '780px' : '460px', maxWidth: '95vw', padding: '28px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden' }}>
+          <div className={`modal-content glass-panel ${activeTab === 'produtos' ? 'modal-wide' : ''}`} style={{ width: activeTab === 'produtos' ? '780px' : '460px', height: 'fit-content', maxWidth: '95vw', padding: '28px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
               <h2>{editingItem ? 'Editar' : (activeTab === 'categorias' ? 'Nova' : 'Novo')} {activeTab === 'categorias' ? 'Categoria' : activeTab === 'adicionais' ? 'Adicional' : 'Produto'}</h2>
               <button className="btn-icon" onClick={closeModal} type="button"><X size={24} /></button>
@@ -304,7 +309,11 @@ export default function CatalogManager() {
                   value={itemName}
                   onChange={e => { setItemName(e.target.value); if(errors.name) setErrors({...errors, name: ''}); }}
                   className={`form-input ${errors.name ? 'input-error' : ''}`} 
-                  placeholder="Ex: Pizza Calabresa"
+                  placeholder={
+                    activeTab === 'categorias' ? "Ex: Pizzas Tradicionais, Bebidas" :
+                    activeTab === 'adicionais' ? "Ex: Borda Recheada, Bacon Extra" :
+                    "Ex: Pizza Calabresa"
+                  }
                 />
                 {errors.name && <span className="form-msg-error">{errors.name}</span>}
               </div>
@@ -416,12 +425,57 @@ export default function CatalogManager() {
 
               {activeTab === 'adicionais' && (
                 <>
-                  <div className="form-group">
-                    <label>Categoria Vinculada</label>
-                    <select name="categoryId" defaultValue={editingItem?.categoryId} required className="form-input">
-                      <option value="">Selecione...</option>
-                      {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                  <div className="form-group" style={{ position: 'relative' }}>
+                    <label>Categorias Vinculadas</label>
+                    <div 
+                      className="form-input" 
+                      style={{ cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                      onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    >
+                      <span style={{ color: selectedCategoryIds.length === 0 ? 'var(--text-muted)' : '#f8fafc' }}>
+                        {selectedCategoryIds.length === 0 
+                          ? 'Selecione as categorias...' 
+                          : `${selectedCategoryIds.length} categoria(s) selecionada(s)`}
+                      </span>
+                      <ChevronDown size={16} color="var(--text-muted)" style={{ transform: isDropdownOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                    </div>
+                    
+                    {isDropdownOpen && (
+                      <div style={{ 
+                        position: 'absolute', 
+                        top: '100%', 
+                        left: 0, 
+                        right: 0, 
+                        zIndex: 10,
+                        marginTop: '4px',
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '8px', 
+                        maxHeight: '200px', 
+                        overflowY: 'auto', 
+                        background: '#1e293b', 
+                        padding: '12px', 
+                        borderRadius: 'var(--radius-sm)', 
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.5)'
+                      }}>
+                        {categories.map(c => (
+                          <label key={c.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0, color: '#f8fafc', fontWeight: 'normal' }}>
+                            <input 
+                              type="checkbox" 
+                              checked={selectedCategoryIds.includes(c.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedCategoryIds([...selectedCategoryIds, c.id]);
+                                else setSelectedCategoryIds(selectedCategoryIds.filter(id => id !== c.id));
+                              }}
+                              style={{ width: '16px', height: '16px', accentColor: 'var(--primary)', cursor: 'pointer' }}
+                            />
+                            {c.name}
+                          </label>
+                        ))}
+                        {categories.length === 0 && <span style={{ color: 'var(--text-muted)' }}>Nenhuma categoria cadastrada.</span>}
+                      </div>
+                    )}
                   </div>
                   <div className="form-group">
                     <label>Preço Adicional</label>

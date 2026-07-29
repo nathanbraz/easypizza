@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, ShieldCheck, AlertTriangle, X, ShieldAlert, Ban, PlayCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
 import './Tenants.css';
 
@@ -11,6 +11,7 @@ interface Tenant {
   isActive?: boolean;
   createdAt?: string;
   whatsAppNumber?: string;
+  themeColor?: string;
 }
 
 export default function TenantsDashboard() {
@@ -72,7 +73,7 @@ export default function TenantsDashboard() {
         connectionString: connectionString || undefined
       });
 
-      setFeedbackMsg({ text: `Pizzaria "${name}" cadastrada e banco de dados isolado gerado com sucesso!`, type: 'success' });
+      setFeedbackMsg({ text: `Empresa "${name}" cadastrada e banco de dados isolado gerado com sucesso!`, type: 'success' });
       setIsModalOpen(false);
       setName('');
       setSlug('');
@@ -80,7 +81,7 @@ export default function TenantsDashboard() {
       fetchTenants();
     } catch (error: any) {
       console.error("Erro ao criar tenant:", error);
-      const errMsg = error.response?.data?.message || error.response?.data || "Erro ao criar pizzaria no back-end.";
+      const errMsg = error.response?.data?.message || error.response?.data || "Erro ao criar empresa no back-end.";
       setFeedbackMsg({ text: typeof errMsg === 'string' ? errMsg : "Falha no cadastro do tenant.", type: 'error' });
     } finally {
       setSubmitting(false);
@@ -98,6 +99,31 @@ export default function TenantsDashboard() {
       setFeedbackMsg({ text: errMsg, type: 'error' });
     } finally {
       setMigratingSlug(null);
+    }
+  };
+
+  const handleSyncAllTenants = async () => {
+    if (!window.confirm("Atenção: Isso vai rodar as Migrations em TODOS os bancos de dados de todos os clientes. Pode levar alguns minutos. Deseja continuar?")) return;
+    
+    setFeedbackMsg(null);
+    try {
+      const res = await api.post('/superadmin/tenants/sync-all');
+      setFeedbackMsg({ text: res.data.message || "Sincronização em massa concluída!", type: 'success' });
+    } catch (error: any) {
+      setFeedbackMsg({ text: "Erro ao tentar sincronizar os bancos de dados.", type: 'error' });
+    }
+  };
+
+  const handleToggleStatus = async (tenantSlug: string, currentStatus: boolean | undefined) => {
+    const action = currentStatus ? "SUSPENDER" : "ATIVAR";
+    if (!window.confirm(`Tem certeza que deseja ${action} esta empresa? ${currentStatus ? "O cardápio e o painel admin dela sairão do ar imediatamente." : "O acesso será restaurado."}`)) return;
+
+    try {
+      await api.put(`/superadmin/tenants/${tenantSlug}/toggle-status`);
+      setFeedbackMsg({ text: `Empresa ${action === "SUSPENDER" ? "suspensa" : "ativada"} com sucesso.`, type: 'success' });
+      fetchTenants(); // Recarrega para ver o novo status
+    } catch (error: any) {
+      setFeedbackMsg({ text: error.response?.data?.message || "Erro ao alterar status da empresa.", type: 'error' });
     }
   };
 
@@ -129,6 +155,11 @@ export default function TenantsDashboard() {
         </div>
         
         <div className="header-buttons">
+          <button className="btn-secondary" onClick={handleSyncAllTenants}>
+            <Database size={18} />
+            <span>Sincronizar Todos os Bancos</span>
+          </button>
+          
           <button className="btn-secondary" onClick={fetchTenants} disabled={loading}>
             <RefreshCw size={18} className={loading ? "spin" : ""} />
             <span>Atualizar Lista</span>
@@ -136,7 +167,7 @@ export default function TenantsDashboard() {
           
           <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
             <Plus size={18} />
-            <span>Cadastrar Nova Pizzaria</span>
+            <span>Cadastrar Empresa</span>
           </button>
         </div>
       </div>
@@ -157,8 +188,8 @@ export default function TenantsDashboard() {
       ) : tenants.length === 0 ? (
         <div className="empty-state glass-panel">
           <Building2 size={56} className="text-muted" />
-          <h3>Nenhuma pizzaria cliente cadastrada (Dia 0)</h3>
-          <p>O seu SaaS ainda não possui clientes contratantes. Clique no botão abaixo para simular o onboarding da sua primeira pizzaria!</p>
+          <h3>Nenhuma empresa cliente cadastrada (Dia 0)</h3>
+          <p>O seu SaaS ainda não possui clientes contratantes. Clique no botão abaixo para simular o onboarding da sua primeira empresa!</p>
           <button className="btn-primary mt-4" onClick={() => setIsModalOpen(true)}>
             <Plus size={18} />
             <span>Cadastrar 1º Cliente (Ex: Pizza Top)</span>
@@ -166,66 +197,63 @@ export default function TenantsDashboard() {
         </div>
       ) : (
         <div className="tenants-grid">
-          {tenants.map((t, idx) => (
-            <div key={t.slug || idx} className="tenant-card glass-panel">
+          {tenants.map((tenant) => (
+            <div key={tenant.id} className={`tenant-card glass-panel ${!tenant.isActive ? 'suspended' : ''}`}>
               <div className="tenant-card-header">
-                <div className="tenant-title">
-                  <div className="tenant-avatar">{t.name.substring(0, 2).toUpperCase()}</div>
+                <div className="tenant-info">
+                  <div className="tenant-avatar" style={{ backgroundColor: tenant.themeColor || '#ff7e5f' }}>
+                    {tenant.name.substring(0, 2).toUpperCase()}
+                  </div>
                   <div>
-                    <h3>{t.name}</h3>
-                    <span className="tenant-slug-badge">{t.slug}</span>
+                    <h3>{tenant.name}</h3>
+                    <span className="tenant-slug">{tenant.slug}</span>
                   </div>
                 </div>
-                <div className="tenant-status">
-                  <span className="badge-active">
-                    <ShieldCheck size={14} /> Ativo
-                  </span>
+                <div className={`status-badge ${tenant.isActive ? 'active' : 'inactive'}`}>
+                  {tenant.isActive ? <CheckCircle2 size={14} /> : <Ban size={14} />}
+                  <span>{tenant.isActive ? 'Ativo' : 'Suspenso'}</span>
                 </div>
               </div>
 
               <div className="tenant-card-body">
                 <div className="db-info">
                   <Database size={16} className="text-accent" />
-                  <div className="db-string-preview" title={t.connectionString}>
+                  <div className="db-string-preview" title={tenant.connectionString}>
                     <span className="label">Banco de Dados Isolado:</span>
-                    <code>{t.connectionString ? t.connectionString.replace(/Password=[^;]+;?/i, 'Password=***;') : 'Automático'}</code>
+                    <code>{tenant.connectionString ? tenant.connectionString.replace(/Password=[^;]+;?/i, 'Password=***;') : 'Automático'}</code>
                   </div>
                 </div>
               </div>
 
               <div className="tenant-card-footer">
-                <button 
-                  className="btn-migrate" 
-                  onClick={() => handleMigrateTenant(t.slug, t.name)}
-                  disabled={migratingSlug === t.slug}
-                  title="Executar EF Core Migrate dinamicamente neste banco"
-                >
-                  <RefreshCw size={14} className={migratingSlug === t.slug ? "spin" : ""} />
-                  <span>{migratingSlug === t.slug ? "Migrando..." : "Sync DB"}</span>
-                </button>
-
-                <div className="tenant-links">
-                  <a 
-                    href={getTenantUrl(t.slug, '')} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="link-btn client-link"
-                    title="Abrir cardápio do cliente"
+                <div className="tenant-actions mt-4">
+                  <button 
+                    className="btn-secondary btn-sm"
+                    onClick={() => handleMigrateTenant(tenant.slug, tenant.name)}
+                    disabled={migratingSlug === tenant.slug}
                   >
-                    <span>Cardápio</span>
+                    <RefreshCw size={14} className={migratingSlug === tenant.slug ? "spin" : ""} />
+                    <span>Sync DB</span>
+                  </button>
+                  
+                  <a href={getTenantUrl(tenant.slug)} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm" title="Abrir Cardápio Público">
                     <ExternalLink size={14} />
+                    <span>Cardápio</span>
                   </a>
                   
-                  <a 
-                    href={getTenantUrl(t.slug, '/admin')} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="link-btn admin-link"
-                    title="Abrir painel administrativo da empresa"
-                  >
-                    <span>Painel Admin</span>
-                    <ExternalLink size={14} />
+                  <a href={getTenantUrl(tenant.slug, '/admin')} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm" title="Entrar como Lojista (Suporte)">
+                    <PlayCircle size={14} />
+                    <span>Acessar Painel</span>
                   </a>
+
+                  <button 
+                    className={`btn-secondary btn-sm ${tenant.isActive ? 'btn-danger-outline' : 'btn-success-outline'}`}
+                    onClick={() => handleToggleStatus(tenant.slug, tenant.isActive)}
+                    style={{ marginLeft: 'auto', borderColor: tenant.isActive ? '#ff4d4d' : '#4caf50', color: tenant.isActive ? '#ff4d4d' : '#4caf50' }}
+                  >
+                    {tenant.isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
+                    <span>{tenant.isActive ? 'Suspender' : 'Ativar'}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -233,21 +261,21 @@ export default function TenantsDashboard() {
         </div>
       )}
 
-      {/* Modal Cadastrar Pizzaria */}
+      {/* Modal Cadastrar Empresa */}
       {isModalOpen && (
         <div className="modal-overlay">
           <div className="modal-content glass-panel">
             <div className="modal-header">
-              <h3>Cadastrar Nova Pizzaria Cliente</h3>
+              <h3>Cadastrar Nova Empresa Cliente</h3>
               <button className="close-btn" onClick={() => setIsModalOpen(false)}>×</button>
             </div>
             
             <form onSubmit={handleCreateTenant}>
               <div className="form-group">
-                <label>Nome da Pizzaria *</label>
+                <label>Nome da Empresa *</label>
                 <input 
                   type="text" 
-                  placeholder="ex: Pizza Top" 
+                  placeholder="ex: Minha Empresa" 
                   value={name}
                   onChange={(e) => handleNameChange(e.target.value)}
                   required 
