@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Edit2, Trash2, X, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
+import Cropper from 'react-easy-crop';
+import 'react-easy-crop/react-easy-crop.css';
+import getCroppedImg from '../../../utils/cropImage';
 import './Catalog.css';
 
 export default function CatalogManager() {
@@ -30,6 +33,46 @@ export default function CatalogManager() {
   // Estados extras para Adicionais
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Estados de Crop
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [croppingIndex, setCroppingIndex] = useState<number | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+
+  const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (!cropImageSrc || !croppedAreaPixels || croppingIndex === null) return;
+    try {
+      setUploadingImage(true);
+      const croppedFile = await getCroppedImg(cropImageSrc, croppedAreaPixels);
+      if (!croppedFile) return;
+
+      const formData = new FormData();
+      formData.append('file', croppedFile);
+      
+      const response = await api.post('/uploads', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      setPreviewImageUrls(prev => {
+        const newUrls = [...prev];
+        newUrls[croppingIndex] = response.data.url;
+        return newUrls;
+      });
+      setCropImageSrc(null);
+      setCroppingIndex(null);
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      alert('Erro ao recortar imagem.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const tenantSlug = 'easypizza';
   
@@ -334,8 +377,14 @@ export default function CatalogManager() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px', maxHeight: '200px', overflowY: 'auto', padding: '4px' }}>
                       {previewImageUrls.map((url, idx) => (
                         <div key={idx} style={{ position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-md)', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <img src={url} alt={`Preview ${idx}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <button type="button" onClick={() => setPreviewImageUrls(prev => prev.filter((_, i) => i !== idx))} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
+                          <img 
+                            src={url} 
+                            alt={`Preview ${idx}`} 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }} 
+                            onClick={() => { setCropImageSrc(url); setCroppingIndex(idx); setCrop({x:0,y:0}); setZoom(1); }}
+                            title="Clique para recortar/ajustar"
+                          />
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setPreviewImageUrls(prev => prev.filter((_, i) => i !== idx)); }} style={{ position: 'absolute', top: '4px', right: '4px', background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#ef4444' }}>
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -361,22 +410,6 @@ export default function CatalogManager() {
                         style={{ display: 'none' }}
                         disabled={uploadingImage}
                       />
-                      <input 
-                        type="url" 
-                        placeholder="Ou cole a URL da imagem e aperte Enter" 
-                        className="form-input" 
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const val = e.currentTarget.value.trim();
-                            if (val) {
-                              setPreviewImageUrls(prev => [...prev, val]);
-                              e.currentTarget.value = '';
-                            }
-                          }
-                        }}
-                        style={{ marginTop: '4px' }}
-                      />
                     </div>
                     
                     <div className="form-group" style={{ marginTop: '16px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -392,7 +425,7 @@ export default function CatalogManager() {
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
                     <div className="form-group">
                       <label>Categoria</label>
                       <select name="categoryId" defaultValue={editingItem?.categoryId} required className="form-input">
@@ -400,9 +433,9 @@ export default function CatalogManager() {
                         {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
-                    <div className="form-group">
+                    <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                       <label>Descrição</label>
-                      <textarea name="description" defaultValue={editingItem?.description} className="form-input" rows={4} placeholder="Ingredientes e detalhes..."></textarea>
+                      <textarea name="description" defaultValue={editingItem?.description} className="form-input" placeholder="Ingredientes e detalhes..." style={{ flex: 1, resize: 'none' }}></textarea>
                     </div>
                     <div className="form-group">
                       <label>Preço</label>
@@ -499,6 +532,48 @@ export default function CatalogManager() {
                 {loadingForm ? 'Salvando...' : 'Salvar'}
               </button>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {cropImageSrc && createPortal(
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-content glass-panel" style={{ width: '600px', height: '600px', display: 'flex', flexDirection: 'column', padding: '20px' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+              <h2>Ajustar Imagem</h2>
+              <button className="btn-icon" onClick={() => { setCropImageSrc(null); setCroppingIndex(null); }} type="button"><X size={24} /></button>
+            </div>
+            <div style={{ position: 'relative', flex: 1, background: '#333', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+              <Cropper
+                image={cropImageSrc}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                onCropChange={setCrop}
+                onCropComplete={onCropComplete}
+                onZoomChange={setZoom}
+              />
+            </div>
+            <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <span style={{ color: 'var(--text-muted)' }}>Zoom</span>
+              <input
+                type="range"
+                value={zoom}
+                min={1}
+                max={3}
+                step={0.1}
+                aria-labelledby="Zoom"
+                onChange={(e) => setZoom(Number(e.target.value))}
+                style={{ flex: 1, accentColor: 'var(--primary)' }}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', gap: '12px' }}>
+              <button type="button" className="btn-secondary" onClick={() => { setCropImageSrc(null); setCroppingIndex(null); }}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={handleCropSave} disabled={uploadingImage}>
+                {uploadingImage ? 'Salvando...' : 'Aplicar Ajuste'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body
