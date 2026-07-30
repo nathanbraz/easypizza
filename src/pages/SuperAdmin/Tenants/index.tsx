@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, ShieldCheck, AlertTriangle, X, ShieldAlert, Ban, PlayCircle } from 'lucide-react';
+import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
 import './Tenants.css';
 

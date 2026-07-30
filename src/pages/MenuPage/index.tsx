@@ -58,7 +58,12 @@ export default function MenuPage() {
           console.error("Token inválido ou expirado", error);
         }
       }
-      // Se não tiver token ou for inválido/expirado
+      
+      // Se não tiver token ou for inválido/expirado, limpa tudo
+      localStorage.removeItem('@EasyPizza:Token');
+      localStorage.removeItem('@EasyPizza:CustomerInfo');
+      localStorage.removeItem('@EasyPizza:CustomerId');
+      setCustomerInfo(null);
       setSessionValid(false);
       setSessionChecking(false);
     };

@@ -6,16 +6,20 @@ import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
 import getCroppedImg from '../../../utils/cropImage';
+import ProductOptionsModal from './ProductOptionsModal';
 import './Catalog.css';
 
 export default function CatalogManager() {
   const [activeTab, setActiveTab] = useState('produtos');
   const [categories, setCategories] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
-  const [addons, setAddons] = useState<any[]>([]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
+  
+  // Opções Modal
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [selectedProductForOptions, setSelectedProductForOptions] = useState<any>(null);
   
   const [loadingForm, setLoadingForm] = useState(false);
   const [formError, setFormError] = useState<string>('');
@@ -40,6 +44,9 @@ export default function CatalogManager() {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  
+  // Estado para Categorias
+  const [allowsHalfAndHalf, setAllowsHalfAndHalf] = useState<boolean>(false);
 
   const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -80,14 +87,12 @@ export default function CatalogManager() {
 
   const loadData = async () => {
     try {
-      const [catRes, prodRes, addRes] = await Promise.all([
+      const [catRes, prodRes] = await Promise.all([
         api.get(`/categories/${tenantSlug}`),
-        api.get(`/products/${tenantSlug}`),
-        api.get(`/addons/${tenantSlug}`)
+        api.get(`/products/${tenantSlug}`)
       ]);
       setCategories(catRes.data);
       setProducts(prodRes.data);
-      setAddons(addRes.data);
     } catch (error) {
       console.error('Error loading catalog data:', error);
     }
@@ -107,9 +112,8 @@ export default function CatalogManager() {
       setItemPrice(item ? String(item.price) : '');
       setPreviewImageUrls(item?.imageUrls || []);
       setIsAvailable(item ? item.isAvailable : true);
-    } else if (activeTab === 'adicionais') {
-      setItemPrice(item ? String(item.additionalPrice) : '');
-      setSelectedCategoryIds(item?.categoryIds || []);
+    } else if (activeTab === 'categorias') {
+      setAllowsHalfAndHalf(item ? item.allowsHalfAndHalf : false);
     }
     
     setIsModalOpen(true);
@@ -121,12 +125,16 @@ export default function CatalogManager() {
     setErrors({});
   };
 
+  const openOptionsModal = (product: any) => {
+    setSelectedProductForOptions(product);
+    setIsOptionsModalOpen(true);
+  };
+
   const handleDelete = async (id: string, type: string) => {
     if (!window.confirm('Tem certeza que deseja excluir?')) return;
     try {
       if (type === 'categoria') await api.delete(`/categories/${tenantSlug}/${id}`);
       if (type === 'produto') await api.delete(`/products/${tenantSlug}/${id}`);
-      if (type === 'adicional') await api.delete(`/addons/${tenantSlug}/${id}`);
       loadData();
     } catch (error) {
       alert('Erro ao excluir item. Verifique dependências.');
@@ -140,7 +148,7 @@ export default function CatalogManager() {
     let newErrors: Record<string, string> = {};
     if (!itemName.trim()) newErrors.name = 'O nome é obrigatório';
     
-    if (activeTab === 'produtos' || activeTab === 'adicionais') {
+    if (activeTab === 'produtos') {
       const p = parseFloat(itemPrice);
       if (isNaN(p) || p < 0) {
         newErrors.price = 'O preço deve ser maior ou igual a zero';
@@ -159,7 +167,8 @@ export default function CatalogManager() {
       if (activeTab === 'categorias') {
         const payload = {
           name: itemName,
-          displayOrder: parseInt(formData.get('displayOrder') as string) || 0
+          displayOrder: parseInt(formData.get('displayOrder') as string) || 0,
+          allowsHalfAndHalf: allowsHalfAndHalf
         };
         if (editingItem) await api.put(`/categories/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/categories/${tenantSlug}`, payload);
@@ -169,21 +178,11 @@ export default function CatalogManager() {
           name: itemName,
           description: formData.get('description'),
           price: parseFloat(itemPrice),
-          categoryId: formData.get('categoryId'),
           imageUrls: previewImageUrls,
           isAvailable: isAvailable
         };
         if (editingItem) await api.put(`/products/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/products/${tenantSlug}`, payload);
-      }
-      else if (activeTab === 'adicionais') {
-        const payload = {
-          name: itemName,
-          additionalPrice: parseFloat(itemPrice),
-          categoryIds: selectedCategoryIds
-        };
-        if (editingItem) await api.put(`/addons/${tenantSlug}/${editingItem.id}`, payload);
-        else await api.post(`/addons/${tenantSlug}`, payload);
       }
       closeModal();
       loadData();
@@ -223,14 +222,13 @@ export default function CatalogManager() {
         <h1>Gestão de Cardápio</h1>
         <button className="btn-primary" onClick={() => openModal()}>
           <Plus size={20} />
-          {activeTab === 'produtos' ? 'Novo Produto' : activeTab === 'categorias' ? 'Nova Categoria' : 'Novo Adicional'}
+          {activeTab === 'produtos' ? 'Novo Produto' : 'Nova Categoria'}
         </button>
       </header>
 
       <div className="catalog-tabs">
-        <button className={`tab-btn ${activeTab === 'produtos' ? 'active' : ''}`} onClick={() => setActiveTab('produtos')}>Produtos</button>
         <button className={`tab-btn ${activeTab === 'categorias' ? 'active' : ''}`} onClick={() => setActiveTab('categorias')}>Categorias</button>
-        <button className={`tab-btn ${activeTab === 'adicionais' ? 'active' : ''}`} onClick={() => setActiveTab('adicionais')}>Adicionais</button>
+        <button className={`tab-btn ${activeTab === 'produtos' ? 'active' : ''}`} onClick={() => setActiveTab('produtos')}>Produtos</button>
       </div>
 
       <main className="catalog-content glass-panel">
@@ -259,8 +257,9 @@ export default function CatalogManager() {
                       <td>R$ {p.price?.toFixed(2)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn-icon" onClick={() => openModal(p)}><Edit2 size={16} /></button>
-                          <button className="btn-icon" style={{ color: '#ef4444' }} onClick={() => handleDelete(p.id, 'produto')}><Trash2 size={16} /></button>
+                          <button className="btn-icon" title="Gerenciar Opções/Tamanhos" onClick={() => openOptionsModal(p)}><Plus size={16} /></button>
+                          <button className="btn-icon" title="Editar Produto" onClick={() => openModal(p)}><Edit2 size={16} /></button>
+                          <button className="btn-icon" title="Excluir Produto" style={{ color: '#ef4444' }} onClick={() => handleDelete(p.id, 'produto')}><Trash2 size={16} /></button>
                         </div>
                       </td>
                     </tr>
@@ -312,7 +311,6 @@ export default function CatalogManager() {
               </thead>
               <tbody>
                 {addons.map(a => {
-                  const cat = categories.find(c => c.id === a.categoryId);
                   return (
                     <tr key={a.id}>
                       <td>{a.name}</td>
@@ -362,10 +360,27 @@ export default function CatalogManager() {
               </div>
 
               {activeTab === 'categorias' && (
-                <div className="form-group">
-                  <label>Ordem de Exibição</label>
-                  <input type="number" name="displayOrder" defaultValue={editingItem?.displayOrder || 0} required className="form-input" />
-                </div>
+                <>
+                  <div className="form-group">
+                    <label>Ordem de Exibição</label>
+                    <input type="number" name="displayOrder" defaultValue={editingItem?.displayOrder || 0} required className="form-input" />
+                  </div>
+                  
+                  <div className="form-group" style={{ marginTop: '8px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={{ margin: 0 }}>Permitir "Meio a Meio"?</label>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ative para produtos como Pizza, onde o cliente pode dividir sabores.</span>
+                    </div>
+                    <label className="toggle-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={allowsHalfAndHalf}
+                        onChange={(e) => setAllowsHalfAndHalf(e.target.checked)}
+                      />
+                      <span className="slider"></span>
+                    </label>
+                  </div>
+                </>
               )}
 
               {activeTab === 'produtos' && (
@@ -438,7 +453,7 @@ export default function CatalogManager() {
                       <textarea name="description" defaultValue={editingItem?.description} className="form-input" placeholder="Ingredientes e detalhes..." style={{ flex: 1, resize: 'none' }}></textarea>
                     </div>
                     <div className="form-group">
-                      <label>Preço</label>
+                      <label>Preço Base</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255, 255, 255, 0.03)', padding: '0 12px', border: '1px solid rgba(255, 255, 255, 0.1)', borderRadius: 'var(--radius-sm)' }} className={`form-input-wrapper ${errors.price ? 'input-error' : ''}`}>
                         <span style={{ color: 'var(--text-muted)' }}>R$</span>
                         <input 
@@ -451,6 +466,9 @@ export default function CatalogManager() {
                         />
                       </div>
                       {errors.price && <span className="form-msg-error">{errors.price}</span>}
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                        💡 Use R$ 0,00 se o preço real vier das opções (ex: Tamanho P/M/G).
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -577,6 +595,17 @@ export default function CatalogManager() {
           </div>
         </div>,
         document.body
+      )}
+
+      {isOptionsModalOpen && selectedProductForOptions && (
+        <ProductOptionsModal 
+          product={selectedProductForOptions}
+          tenantSlug={tenantSlug}
+          onClose={() => {
+            setIsOptionsModalOpen(false);
+            setSelectedProductForOptions(null);
+          }}
+        />
       )}
     </div>
   );

@@ -220,14 +220,59 @@ export default function OrderTrackerPage() {
 
                 {order.items && order.items.length > 0 && (
                   <div className="glass-panel" style={{ padding: '20px', borderRadius: 'var(--radius-lg)', marginTop: '24px' }}>
-                    <h3 style={{ fontSize: '16px', marginBottom: '12px', color: '#fff' }}>Resumo dos Itens</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <h3 style={{ fontSize: '16px', marginBottom: '12px', color: '#fff' }}>Resumo do Pedido</h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       {order.items.map((it: any) => (
-                        <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px', color: 'var(--text-secondary)' }}>
-                          <span>{it.quantity}x {it.product?.name || 'Pizza Gourmet'}</span>
-                          <span style={{ color: '#fff', fontWeight: 600 }}>R$ {(it.quantity * it.unitPrice).toFixed(2)}</span>
+                        <div key={it.id} style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                          {/* Linha principal do item */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
+                            <span style={{ color: '#fff', fontWeight: 600 }}>
+                              {it.quantity}x {it.product?.name || 'Item'}
+                            </span>
+                            <span style={{ color: '#fff', fontWeight: 700 }}>
+                              R$ {(it.quantity * it.unitPrice).toFixed(2)}
+                            </span>
+                          </div>
+                          {/* Opções/Adicionais */}
+                          {it.addons && it.addons.length > 0 && it.addons.map((addon: any, aIdx: number) => (
+                            <div key={aIdx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', paddingLeft: '12px' }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                ↳ {addon.quantity && addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.addonName}
+                              </span>
+                              {Number(addon.price) > 0 && (
+                                <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
+                                  +R$ {Number(addon.price).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {/* Observação */}
+                          {it.notes && (
+                            <div style={{ fontSize: '11px', fontStyle: 'italic', color: '#f59e0b', paddingLeft: '12px' }}>
+                              📝 {it.notes}
+                            </div>
+                          )}
                         </div>
                       ))}
+                    </div>
+                    {/* Resumo financeiro */}
+                    <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {Number(order.deliveryFee) > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                          <span>Taxa de Entrega</span>
+                          <span>R$ {Number(order.deliveryFee).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {Number(order.discountAmount) > 0 && (
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#22c55e' }}>
+                          <span>Desconto {order.couponCode ? `(${order.couponCode})` : ''}</span>
+                          <span>-R$ {Number(order.discountAmount).toFixed(2)}</span>
+                        </div>
+                      )}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 700, color: 'var(--primary)', marginTop: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <span>Total</span>
+                        <span>R$ {Number(order.totalAmount).toFixed(2)}</span>
+                      </div>
                     </div>
                   </div>
                 )}

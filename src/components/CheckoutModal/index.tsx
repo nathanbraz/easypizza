@@ -111,8 +111,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       item.baseProduct.id === drink.id && 
       !item.isHalfHalf && 
       !item.observation && 
-      !item.size && 
-      (!item.selectedAddons || item.selectedAddons.length === 0)
+      (!item.selectedOptions || item.selectedOptions.length === 0)
     );
 
     if (existingIndex >= 0) {
@@ -249,7 +248,24 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
         items: cart.map(item => ({
           productId: item.baseProduct.id,
           quantity: item.quantity,
-          unitPrice: item.finalPrice / item.quantity
+          unitPrice: item.finalPrice / item.quantity,
+          notes: item.observation || null,
+          addons: [
+            // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.)
+            ...(item.selectedOptions?.map((opt: any) => ({
+              productOptionItemId: opt.id || null,
+              addonName: opt.name,
+              price: opt.additionalPrice || 0,
+              quantity: opt.quantity || 1
+            })) || []),
+            // Bebidas selecionadas no modal do produto (cross-sell)
+            ...(item.selectedDrinks?.map((d: any) => ({
+              productOptionItemId: null,
+              addonName: d.name,
+              price: d.price || 0,
+              quantity: 1
+            })) || [])
+          ]
         }))
       };
       
@@ -333,10 +349,9 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                      <div className="rich-cart-customizations">
                        {item.baseProduct.description && <div className="custom-item description">Ingredientes: {item.baseProduct.description}</div>}
                        {item.isHalfHalf && <div className="custom-item highlight">• 1/2 {item.secondHalf?.name}</div>}
-                       {item.crust && item.crust.price > 0 && <div className="custom-item">• Borda: {item.crust.name} (+R${item.crust.price.toFixed(2)})</div>}
                        
-                       {item.selectedAddons && item.selectedAddons.map((addon: any, idx: number) => (
-                          <div key={idx} className="custom-item addon">• Adicional: {addon.name}</div>
+                       {item.selectedOptions && item.selectedOptions.map((opt: any, idx: number) => (
+                          <div key={idx} className="custom-item addon">• {opt.groupName}: {opt.name} {opt.additionalPrice > 0 ? `(+R$ ${opt.additionalPrice.toFixed(2)})` : ''}</div>
                        ))}
                        
                        {item.selectedDrinks && item.selectedDrinks.map((d: any, idx: number) => (
@@ -462,7 +477,9 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                          <span style={{ color: 'var(--primary)', fontWeight: 'bold', background: 'rgba(255, 87, 34, 0.1)', padding: '2px 8px', borderRadius: '4px', height: 'fit-content' }}>{item.quantity}x</span>
                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                            <span style={{ fontWeight: '600', fontSize: '0.95rem' }}>{item.baseProduct.name}</span>
-                           {item.size && <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Tam: {item.size.name}</span>}
+                           {item.selectedOptions && item.selectedOptions.map((opt: any, idx: number) => (
+                             <span key={idx} style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{opt.name}</span>
+                           ))}
                            {item.isHalfHalf && <span style={{ fontSize: '0.8rem', color: '#fbbf24' }}>1/2 {item.secondHalf?.name}</span>}
                          </div>
                        </div>

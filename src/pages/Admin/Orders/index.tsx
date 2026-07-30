@@ -1,16 +1,23 @@
 import { useState, useEffect } from 'react';
-import { MoreVertical, RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox } from 'lucide-react';
+import { RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import './Orders.css';
 
 type ColumnStatus = 'new' | 'preparing' | 'delivering' | 'done';
 
 interface OrderItem {
+  id?: string;
   quantity: number;
   unitPrice: number;
+  notes?: string;
   product?: {
     name: string;
   };
+  addons?: {
+    addonName: string;
+    price: number;
+    quantity?: number;
+  }[];
 }
 
 interface Order {
@@ -136,12 +143,24 @@ export default function OrdersDashboard() {
     if (order.items && order.items.length > 0) {
       order.items.forEach(item => {
         const itemTotal = (item.quantity * Number(item.unitPrice || 0)).toFixed(2);
+        const addonsHtml = item.addons && item.addons.length > 0
+          ? item.addons.map(a => {
+              const qty = a.quantity && a.quantity > 1 ? `${a.quantity}x ` : '';
+              const price = Number(a.price) > 0 ? ` (+R$ ${Number(a.price).toFixed(2)})` : '';
+              return `<tr><td></td><td style="font-size:11px;color:#555;">  ↳ ${qty}${a.addonName}${price}</td><td></td></tr>`;
+            }).join('')
+          : '';
+        const notesHtml = item.notes
+          ? `<tr><td></td><td style="font-size:10px;font-style:italic;color:#777;">  📝 Obs: ${item.notes}</td><td></td></tr>`
+          : '';
         itemsHtml += `
           <tr>
             <td class="item-qty">${item.quantity}x</td>
             <td>${item.product?.name || 'Item'}</td>
             <td class="item-price">R$ ${itemTotal}</td>
           </tr>
+          ${addonsHtml}
+          ${notesHtml}
         `;
       });
     } else {
@@ -260,7 +279,7 @@ export default function OrdersDashboard() {
   ];
 
   return (
-    <div className="orders-kds animate-fade-in" onClick={() => { if (openMenuOrderId !== null) setOpenMenuOrderId(null); }}>
+    <div className="orders-kds animate-fade-in">
       <header className="kds-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <h1>Pedidos</h1>
@@ -449,11 +468,33 @@ export default function OrdersDashboard() {
                   <tbody>
                     {selectedOrder.items && selectedOrder.items.length > 0 ? (
                       selectedOrder.items.map((item, idx) => (
-                        <tr key={idx}>
-                          <td><strong>{item.quantity}x</strong></td>
-                          <td>{item.product?.name || 'Item'}</td>
-                          <td style={{ textAlign: 'right' }}>R$ {(item.quantity * Number(item.unitPrice || 0)).toFixed(2)}</td>
-                        </tr>
+                        <>
+                          <tr key={idx}>
+                            <td><strong>{item.quantity}x</strong></td>
+                            <td><strong>{item.product?.name || 'Item'}</strong></td>
+                            <td style={{ textAlign: 'right' }}>R$ {(item.quantity * Number(item.unitPrice || 0)).toFixed(2)}</td>
+                          </tr>
+                          {/* Opções/Adicionais do item */}
+                          {item.addons && item.addons.map((addon, aIdx) => (
+                            <tr key={`addon-${idx}-${aIdx}`} style={{ opacity: 0.8 }}>
+                              <td></td>
+                              <td style={{ fontSize: '12px', color: 'var(--text-muted)', paddingLeft: '12px' }}>
+                                ↳ {addon.quantity && addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.addonName}
+                                {Number(addon.price) > 0 && <span style={{ color: 'var(--primary)', marginLeft: '6px' }}>+R$ {Number(addon.price).toFixed(2)}</span>}
+                              </td>
+                              <td></td>
+                            </tr>
+                          ))}
+                          {/* Observação do item */}
+                          {item.notes && (
+                            <tr key={`note-${idx}`}>
+                              <td></td>
+                              <td colSpan={2} style={{ fontSize: '11px', fontStyle: 'italic', color: '#f59e0b', paddingLeft: '12px' }}>
+                                📝 {item.notes}
+                              </td>
+                            </tr>
+                          )}
+                        </>
                       ))
                     ) : (
                       <tr>

@@ -333,3 +333,82 @@
     border-radius: var(--radius-lg);
   }
 }
+
+/* ===== CONTADOR DE ADICIONAIS (Estilo Pede.Ai) ===== */
+.counter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.counter-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+.counter-item:last-child {
+  border-bottom: none;
+}
+.counter-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.counter-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.counter-item-info .name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.counter-item-info .price {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.counter-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.counter-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  background: transparent;
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.counter-btn:hover:not(:disabled) {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.1);
+}
+.counter-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.2);
+}
+
+.counter-value {
+  font-size: 16px;
+  font-weight: 700;
+  min-width: 20px;
+  text-align: center;
+  color: var(--text-primary);
+}
