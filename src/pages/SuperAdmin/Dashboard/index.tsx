@@ -32,9 +32,9 @@ export default function SuperAdminDashboard() {
 
   if (loading || !metrics) {
     return (
-      <div className="dashboard-loading">
-        <div className="spinner"></div>
-        <p>Carregando métricas do sistema...</p>
+      <div className="dashboard-loading" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div className="global-spinner"></div>
+        <p style={{ color: 'var(--text-muted)' }}>Carregando métricas do sistema...</p>
       </div>
     );
   }

@@ -20,6 +20,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
   const [groupType, setGroupType] = useState<'single' | 'multiple' | 'counter'>('single');
   const [groupMin, setGroupMin] = useState(0);
   const [groupMax, setGroupMax] = useState(1);
+  const [groupDisplayOrder, setGroupDisplayOrder] = useState(0);
 
   // Item Form State
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
@@ -27,6 +28,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
   const [editingItem, setEditingItem] = useState<any>(null);
   const [itemName, setItemName] = useState('');
   const [itemPrice, setItemPrice] = useState('0');
+  const [itemDisplayOrder, setItemDisplayOrder] = useState(0);
 
   // Copy Options State
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -65,7 +67,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
       isRequired: isRequired,
       minChoices: finalMin,
       maxChoices: isCounter ? 99 : finalMax, // contador sem limite fixo
-      displayOrder: 0
+      displayOrder: groupDisplayOrder
     };
 
     try {
@@ -98,10 +100,12 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
       setGroupType(group.groupType ?? (group.maxChoices === 1 && group.minChoices === 1 ? 'single' : 'multiple'));
       setGroupMin(group.minChoices || 0);
       setGroupMax(group.maxChoices || 10);
+      setGroupDisplayOrder(group.displayOrder || 0);
     } else {
       setGroupType('single');
       setGroupMin(0);
       setGroupMax(10);
+      setGroupDisplayOrder(0);
     }
     setIsGroupFormOpen(true);
   };
@@ -113,7 +117,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
     const payload = {
       name: itemName,
       additionalPrice: parseFloat(itemPrice) || 0,
-      displayOrder: 0
+      displayOrder: itemDisplayOrder
     };
 
     try {
@@ -144,6 +148,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
     setEditingItem(item || null);
     setItemName(item?.name || '');
     setItemPrice(item ? String(item.additionalPrice) : '0');
+    setItemDisplayOrder(item?.displayOrder || 0);
     setIsItemFormOpen(true);
   };
 
@@ -218,7 +223,10 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           {loading ? (
-            <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando opções...</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center', padding: '40px 0' }}>
+              <div className="global-spinner" />
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Carregando opções...</p>
+            </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               
@@ -296,8 +304,9 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
       {isGroupFormOpen && (
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="modal-content glass-panel" style={{ width: '500px', padding: '24px' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '8px' }}>{editingGroup ? 'Editar Seção' : 'Nova Seção (Grupo de Opções)'}</h3>
+          <div className="modal-content glass-panel" style={{ width: '500px', padding: '24px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button className="modal-close" style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsGroupFormOpen(false)}><X size={20} /></button>
+            <h3 style={{ marginTop: 0, marginBottom: '8px', paddingRight: '24px' }}>{editingGroup ? 'Editar Seção' : 'Nova Seção (Grupo de Opções)'}</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '20px' }}>
               Uma seção agrupa várias opções. Exemplo: "Escolha o Tamanho" terá dentro dela as opções "Pequena", "Média", etc.
             </p>
@@ -366,6 +375,12 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                 </div>
               )}
 
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '12px' }}>Ordem de Exibição</label>
+                <input type="number" className="form-input" value={groupDisplayOrder} onChange={e => setGroupDisplayOrder(parseInt(e.target.value))} required />
+                <p style={{ margin: '4px 0 0', fontSize: '11px', color: 'var(--text-muted)' }}>Use números menores para aparecer primeiro (ex: 1, 2, 3).</p>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setIsGroupFormOpen(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary">Salvar Seção</button>
@@ -377,8 +392,9 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
       {isItemFormOpen && (
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="modal-content glass-panel" style={{ width: '400px', padding: '24px' }}>
-            <h3 style={{ marginTop: 0 }}>{editingItem ? 'Editar Escolha' : 'Nova Escolha'}</h3>
+          <div className="modal-content glass-panel" style={{ width: '400px', padding: '24px', maxHeight: '90vh', overflowY: 'auto', position: 'relative' }}>
+            <button className="modal-close" style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsItemFormOpen(false)}><X size={20} /></button>
+            <h3 style={{ marginTop: 0, paddingRight: '24px' }}>{editingItem ? 'Editar Escolha' : 'Nova Escolha'}</h3>
             <form onSubmit={saveItem} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">
                 <label>Nome da Escolha</label>
@@ -388,6 +404,11 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
               <div className="form-group">
                 <label>Preço Adicional / Preço Final</label>
                 <input type="number" step="0.01" className="form-input" value={itemPrice} onChange={e => setItemPrice(e.target.value)} required />
+              </div>
+
+              <div className="form-group">
+                <label>Ordem de Exibição</label>
+                <input type="number" className="form-input" value={itemDisplayOrder} onChange={e => setItemDisplayOrder(parseInt(e.target.value))} required />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
@@ -401,8 +422,9 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
       {isCopyModalOpen && (
         <div className="modal-overlay" style={{ zIndex: 1200 }}>
-          <div className="modal-content glass-panel" style={{ width: '500px', padding: '24px' }}>
-            <h3 style={{ marginTop: 0 }}>Copiar Opções de Outro Produto</h3>
+          <div className="modal-content glass-panel" style={{ width: '500px', padding: '24px', position: 'relative' }}>
+            <button className="modal-close" style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsCopyModalOpen(false)}><X size={20} /></button>
+            <h3 style={{ marginTop: 0, paddingRight: '24px' }}>Copiar Opções de Outro Produto</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
               Selecione de qual produto você deseja copiar os Tamanhos e Adicionais. Isso substituirá as opções atuais caso existam (ou as adicionará).
             </p>

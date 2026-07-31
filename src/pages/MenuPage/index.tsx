@@ -28,7 +28,7 @@ export default function MenuPage() {
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
   const sessionToken = queryParams.get('t');
-  
+
   const [customerInfo, setCustomerInfo] = useState<any | null>(() => {
     const saved = localStorage.getItem('@EasyPizza:CustomerInfo');
     return saved ? JSON.parse(saved) : null;
@@ -58,7 +58,7 @@ export default function MenuPage() {
           console.error("Token inválido ou expirado", error);
         }
       }
-      
+
       // Se não tiver token ou for inválido/expirado, limpa tudo
       localStorage.removeItem('@EasyPizza:Token');
       localStorage.removeItem('@EasyPizza:CustomerInfo');
@@ -127,7 +127,8 @@ export default function MenuPage() {
 
   if (sessionChecking) {
     return (
-      <div className="menu-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+      <div className="menu-page" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <div className="global-spinner" />
         <p style={{ color: 'var(--text-secondary)' }}>Verificando sua sessão...</p>
       </div>
     );
@@ -143,14 +144,19 @@ export default function MenuPage() {
       try {
         const slug = getTenantSlugFromUrl();
         const res = await api.post('/sessions/magic-link', {
-          phoneNumber: '5511999999999',
-          name: 'Cliente de Teste'
+          phoneNumber: '5562996753082',
+          name: 'Nathan Braz'
         }, {
           headers: { 'X-Tenant-Slug': slug }
         });
         const data = res.data.data || res.data;
         if (data && data.sessionId) {
-          window.location.href = `/${slug}?t=${data.sessionId}`;
+          const isSub = window.location.hostname.includes('.') && !window.location.hostname.startsWith('localhost');
+          if (isSub) {
+            window.location.href = `/?t=${data.sessionId}`;
+          } else {
+            window.location.href = `/${slug}?t=${data.sessionId}`;
+          }
         }
       } catch (error) {
         console.error("Erro ao simular sessão de teste", error);
@@ -229,7 +235,7 @@ export default function MenuPage() {
                 <p>{customerInfo.lastOrderSummary}</p>
               </div>
             </div>
-            <button 
+            <button
               className="reorder-action-btn"
               onClick={() => navigate(customerInfo.lastOrderId ? `/tracker/${customerInfo.lastOrderId}` : '/tracker')}
             >
@@ -248,10 +254,10 @@ export default function MenuPage() {
               <h2 className="section-title">{category.name}</h2>
               <div className="product-grid">
                 {category.products && category.products.map((product: Product, index: number) => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={{...product, categoryName: category.name, addons: category.addons}} 
-                    onAdd={handleOpenModal} 
+                  <ProductCard
+                    key={product.id}
+                    product={{ ...product, categoryName: category.name, categoryId: category.id, allowsHalfAndHalf: category.allowsHalfAndHalf, addons: category.addons }}
+                    onAdd={handleOpenModal}
                     delay={index * 0.1}
                   />
                 ))}
@@ -264,19 +270,19 @@ export default function MenuPage() {
       {!isCheckoutOpen && !selectedProduct && cart.length > 0 && <Cart items={cart} onCheckout={() => setIsCheckoutOpen(true)} />}
 
       {selectedProduct && (
-        <ProductModal 
-          product={selectedProduct} 
-          availableProducts={categories.flatMap(c => c.products.map(p => ({...p, categoryName: c.name})))}
-          onClose={() => setSelectedProduct(null)} 
+        <ProductModal
+          product={selectedProduct}
+          availableProducts={categories.flatMap(c => c.products.map(p => ({ ...p, categoryName: c.name, categoryId: c.id })))}
+          onClose={() => setSelectedProduct(null)}
           onAddToCart={handleAddToCart}
         />
       )}
 
       {isCheckoutOpen && (
-        <CheckoutModal 
+        <CheckoutModal
           cart={cart}
           updateCart={setCart}
-          availableProducts={categories.flatMap(c => c.products.map(p => ({...p, categoryName: c.name})))}
+          availableProducts={categories.flatMap(c => c.products.map(p => ({ ...p, categoryName: c.name })))}
           tenantSlug={getTenantSlugFromUrl()}
           storeSettings={storeSettings}
           onClose={() => setIsCheckoutOpen(false)}

@@ -20,6 +20,36 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
 
   const finalImage = imgUrl || getFallbackImage();
 
+  const getDisplayPrice = () => {
+    if (product.price > 0) {
+      return `R$ ${product.price.toFixed(2)}`;
+    }
+
+    let minAdditionalPrice = 0;
+    let hasMandatoryOptions = false;
+
+    if (product.optionGroups && product.optionGroups.length > 0) {
+      product.optionGroups.forEach(group => {
+        if (group.minChoices > 0 && group.options && group.options.length > 0) {
+          hasMandatoryOptions = true;
+          // Encontra a opção mais barata deste grupo obrigatório
+          const cheapestOption = Math.min(...group.options.map(o => o.additionalPrice));
+          minAdditionalPrice += (cheapestOption * group.minChoices);
+        }
+      });
+    }
+
+    if (hasMandatoryOptions && minAdditionalPrice > 0) {
+      return `A partir de R$ ${minAdditionalPrice.toFixed(2)}`;
+    }
+
+    if (product.optionGroups && product.optionGroups.length > 0) {
+      return 'Ver opções';
+    }
+
+    return 'Grátis';
+  };
+
   return (
     <div 
       className="product-card animate-fade-in"
@@ -27,7 +57,7 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
     >
       <div className="product-image-container">
         <img src={finalImage} alt={product.name} />
-        <div className="price-tag">R$ {product.price.toFixed(2)}</div>
+        <div className="price-tag">{getDisplayPrice()}</div>
       </div>
       
       <div className="product-info">

@@ -146,7 +146,8 @@ export default function OrderTrackerPage() {
         {activeTab === 'tracker' && (
           <>
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)' }}>
+              <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+                <div className="global-spinner" />
                 Carregando informações do pedido...
               </div>
             ) : !order ? (

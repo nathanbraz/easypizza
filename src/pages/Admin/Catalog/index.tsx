@@ -33,6 +33,7 @@ export default function CatalogManager() {
   const [previewImageUrls, setPreviewImageUrls] = useState<string[]>([]);
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
+  const [showInCrossSell, setShowInCrossSell] = useState<boolean>(false);
 
   // Estados extras para Adicionais
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
@@ -47,7 +48,6 @@ export default function CatalogManager() {
   
   // Estado para Categorias
   const [allowsHalfAndHalf, setAllowsHalfAndHalf] = useState<boolean>(false);
-
   const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
@@ -112,9 +112,11 @@ export default function CatalogManager() {
       setItemPrice(item ? String(item.price) : '');
       setPreviewImageUrls(item?.imageUrls || []);
       setIsAvailable(item ? item.isAvailable : true);
+      setShowInCrossSell(item ? item.showInCrossSell : false);
     } else if (activeTab === 'categorias') {
       setAllowsHalfAndHalf(item ? item.allowsHalfAndHalf : false);
     }
+
     
     setIsModalOpen(true);
   };
@@ -153,6 +155,11 @@ export default function CatalogManager() {
       if (isNaN(p) || p < 0) {
         newErrors.price = 'O preço deve ser maior ou igual a zero';
       }
+      
+      const formDataForValidation = new FormData(e.currentTarget);
+      if (!formDataForValidation.get('categoryId')) {
+        newErrors.categoryId = 'A categoria é obrigatória';
+      }
     }
     
     if (Object.keys(newErrors).length > 0) {
@@ -168,18 +175,20 @@ export default function CatalogManager() {
         const payload = {
           name: itemName,
           displayOrder: parseInt(formData.get('displayOrder') as string) || 0,
-          allowsHalfAndHalf: allowsHalfAndHalf
+          allowsHalfAndHalf
         };
         if (editingItem) await api.put(`/categories/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/categories/${tenantSlug}`, payload);
       } 
       else if (activeTab === 'produtos') {
         const payload = {
+          categoryId: formData.get('categoryId'),
           name: itemName,
           description: formData.get('description'),
-          price: parseFloat(itemPrice),
+          price: parseFloat(itemPrice.replace(',', '.')),
           imageUrls: previewImageUrls,
-          isAvailable: isAvailable
+          isAvailable,
+          showInCrossSell
         };
         if (editingItem) await api.put(`/products/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/products/${tenantSlug}`, payload);
@@ -434,6 +443,21 @@ export default function CatalogManager() {
                           type="checkbox" 
                           checked={isAvailable}
                           onChange={(e) => setIsAvailable(e.target.checked)}
+                        />
+                        <span className="slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '16px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label style={{ margin: 0 }}>Sugerir no Carrinho (Cross-Sell)?</label>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ative para mostrar este produto na vitrine "Aproveite e leve também" ao finalizar o pedido.</span>
+                      </div>
+                      <label className="toggle-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={showInCrossSell}
+                          onChange={(e) => setShowInCrossSell(e.target.checked)}
                         />
                         <span className="slider"></span>
                       </label>

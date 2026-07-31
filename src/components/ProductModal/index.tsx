@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Minus } from 'lucide-react';
+import { X, Plus, Minus, Search } from 'lucide-react';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './ProductModal.css';
@@ -23,17 +23,17 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   // State for counter quantities (key: itemId, value: quantity number)
   const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({});
 
-  const [isHalfHalf, setIsHalfHalf] = useState(false);
-  const [secondHalf, setSecondHalf] = useState<any | null>(null);
-  
   // Cross-sell Drinks
   const [selectedDrinks, setSelectedDrinks] = useState<any[]>([]);
   const [observation, setObservation] = useState('');
   const [quantity, setQuantity] = useState(1);
-  
-  // Check if product belongs to a category that allows half and half. For now, fallback to "pizza" logic if flag is missing.
-  // Ideally, the backend product DTO should include category.allowsHalfAndHalf.
-  const allowsHalfAndHalf = product.categoryName?.toLowerCase().includes('pizza') ?? false;
+
+  // Half and Half (Meio a Meio)
+  const [isHalfAndHalf, setIsHalfAndHalf] = useState(false);
+  const [secondHalfProductId, setSecondHalfProductId] = useState<string>('');
+  const [secondHalfOptions, setSecondHalfOptions] = useState<any[]>([]);
+  const [loadingSecondHalf, setLoadingSecondHalf] = useState(false);
+  const [searchHalf, setSearchHalf] = useState('');
 
   useLockBodyScroll();
 
@@ -45,14 +45,10 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
         const groups = res.data;
         setOptionGroups(groups);
         
-        // Auto-select first item for radio buttons (maxChoices === 1 and isRequired === true)
+        // Start all groups without auto-selection
         const initialSelections: Record<string, string[]> = {};
         groups.forEach((g: any) => {
-          if (g.maxChoices === 1 && g.isRequired && g.options?.length > 0) {
-            initialSelections[g.id] = [g.options[0].id];
-          } else {
-            initialSelections[g.id] = [];
-          }
+          initialSelections[g.id] = [];
         });
         setSelections(initialSelections);
         
@@ -64,6 +60,25 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     };
     fetchOptions();
   }, [product.id, tenantSlug]);
+
+  useEffect(() => {
+    if (!isHalfAndHalf || !secondHalfProductId) {
+      setSecondHalfOptions([]);
+      return;
+    }
+    const fetchSecondHalfOptions = async () => {
+      try {
+        setLoadingSecondHalf(true);
+        const res = await api.get(`/productoptions/${tenantSlug}/product/${secondHalfProductId}`);
+        setSecondHalfOptions(res.data);
+      } catch (error) {
+        console.error('Error fetching 2nd half options', error);
+      } finally {
+        setLoadingSecondHalf(false);
+      }
+    };
+    fetchSecondHalfOptions();
+  }, [secondHalfProductId, isHalfAndHalf, tenantSlug]);
 
   const handleToggleOption = (groupId: string, itemId: string, maxChoices: number) => {
     setSelections(prev => {
@@ -111,9 +126,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
 
   // Pricing Logic
   const basePrice = product.price;
-  const finalBasePrice = isHalfHalf && secondHalf 
-    ? ((basePrice / 2) + (secondHalf.price / 2)) 
-    : basePrice;
     
   // Calculate total additional price from selected options (radio/checkbox)
   let optionsTotal = 0;
@@ -142,15 +154,52 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     }
   });
   
+  // Half and Half logic
+  let halfAndHalfExtraPrice = 0;
+  let secondHalfProductObj = null;
+
+  if (isHalfAndHalf && secondHalfProductId && secondHalfOptions.length > 0) {
+    secondHalfProductObj = availableProducts.find(p => p.id === secondHalfProductId);
+    if (secondHalfProductObj) {
+      // Find matching size/options that the user selected in the MAIN product
+      selectedOptionObjects.forEach(mainOpt => {
+        const group = optionGroups.find(g => g.name === mainOpt.groupName);
+        // Only consider single choice groups like Size, Crust for pricing diff
+        if (group && group.maxChoices === 1) {
+          const matchingGroup2 = secondHalfOptions.find(g => g.name === group.name);
+          if (matchingGroup2) {
+            const matchingOpt2 = matchingGroup2.options.find((o: any) => o.name === mainOpt.name);
+            if (matchingOpt2) {
+              const diff = (matchingOpt2.additionalPrice || 0) - (mainOpt.additionalPrice || 0);
+              // Charge the most expensive half
+              if (diff > 0) {
+                halfAndHalfExtraPrice += diff;
+              }
+            }
+          }
+        }
+      });
+      
+      const baseDiff = secondHalfProductObj.price - basePrice;
+      if (baseDiff > 0) {
+        halfAndHalfExtraPrice += baseDiff;
+      }
+    }
+  }
+
   const drinksTotal = selectedDrinks.reduce((sum, d) => sum + d.price, 0);
   
-  const unitTotal = finalBasePrice + optionsTotal;
+  const unitTotal = basePrice + optionsTotal + halfAndHalfExtraPrice;
   const finalTotal = (unitTotal * quantity) + drinksTotal;
 
   // Validation: counter groups just need to be present, radio/checkbox groups need minChoices
   const isValid = optionGroups.every((g: any) => {
-    if (g.groupType === 'counter') return true; // counter is always optional
-    const selectedCount = (selections[g.id] || []).length;
+    let selectedCount = 0;
+    if (g.groupType === 'counter') {
+      selectedCount = g.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
+    } else {
+      selectedCount = (selections[g.id] || []).length;
+    }
     return selectedCount >= g.minChoices;
   });
 
@@ -160,11 +209,27 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       return;
     }
     
+    if (isHalfAndHalf && secondHalfProductId && !secondHalfProductObj) {
+      alert("Aguarde o carregamento do 2º sabor ou selecione uma opção válida.");
+      return;
+    }
+    
+    // Add the second half as a pseudo-option so it appears in the cart and backend
+    const finalSelectedOptions = [...selectedOptionObjects];
+    if (isHalfAndHalf && secondHalfProductObj) {
+      finalSelectedOptions.push({
+        groupName: 'Meio a Meio',
+        name: `Meia ${secondHalfProductObj.name}`,
+        additionalPrice: halfAndHalfExtraPrice,
+        quantity: 1,
+        description: secondHalfProductObj.description,
+        imageUrl: secondHalfProductObj.imageUrl || (secondHalfProductObj.imageUrls && secondHalfProductObj.imageUrls.length > 0 ? secondHalfProductObj.imageUrls[0] : null)
+      });
+    }
+
     const finalItem = {
       baseProduct: product,
-      selectedOptions: selectedOptionObjects,
-      isHalfHalf,
-      secondHalf,
+      selectedOptions: finalSelectedOptions,
       selectedDrinks,
       observation,
       quantity,
@@ -192,13 +257,19 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
           </div>
 
           {loadingOptions ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+            <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
+              <div className="global-spinner" />
               Carregando opções...
             </div>
           ) : (
             <>
               {optionGroups.map((group) => {
-                const selectedCount = (selections[group.id] || []).length;
+                let selectedCount = 0;
+                if (group.groupType === 'counter') {
+                  selectedCount = group.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
+                } else {
+                  selectedCount = (selections[group.id] || []).length;
+                }
                 const isGroupValid = selectedCount >= group.minChoices;
                 const isMaxReached = selectedCount >= group.maxChoices;
 
@@ -211,11 +282,9 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                           {group.minChoices > 0 ? `Escolha de ${group.minChoices} até ${group.maxChoices} opções` : `Escolha até ${group.maxChoices} opções`}
                         </p>
                       </div>
-                      {group.minChoices > 0 && (
-                        <span className="required-badge" style={{ backgroundColor: isGroupValid ? 'rgba(34, 197, 94, 0.1)' : '', color: isGroupValid ? '#22c55e' : '' }}>
-                          {isGroupValid ? '✓ Concluído' : 'Obrigatório'}
-                        </span>
-                      )}
+                      <span className="required-badge" style={{ backgroundColor: isGroupValid ? 'rgba(34, 197, 94, 0.1)' : '', color: isGroupValid ? '#22c55e' : '' }}>
+                        {isGroupValid ? `✓ Concluído (${selectedCount}/${group.maxChoices})` : `${selectedCount}/${group.maxChoices}`}
+                      </span>
                     </div>
                     
                     <div className={group.groupType === 'counter' ? 'counter-group' : (group.maxChoices === 1 ? "radio-group" : "checkbox-group")}>
@@ -290,54 +359,110 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                 );
               })}
 
-              {allowsHalfAndHalf && (
-                <section className="modal-section highlight-section">
-                  <div className="section-header">
-                    <h3>Dividir Sabores? (Meio a Meio)</h3>
+              {/* Half and Half UI Section */}
+              {(product as any).allowsHalfAndHalf && (
+                <section className="modal-section" style={{ background: 'linear-gradient(145deg, rgba(251,146,60,0.08) 0%, rgba(251,146,60,0.02) 100%)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 'var(--radius-lg)', padding: '20px', marginTop: '24px', marginBottom: '24px' }}>
+                  <div className="section-header" style={{ marginBottom: isHalfAndHalf ? '20px' : '0', padding: 0 }}>
+                    <div>
+                      <h3 style={{ color: '#fb923c', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>🍕 Dividir Sabores (Meio a Meio)?</h3>
+                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>Escolha outro sabor para dividir a pizza.</p>
+                    </div>
+                    <label className="toggle-switch">
+                      <input 
+                        type="checkbox" 
+                        checked={isHalfAndHalf} 
+                        onChange={(e) => {
+                          setIsHalfAndHalf(e.target.checked);
+                          if (!e.target.checked) setSecondHalfProductId('');
+                        }} 
+                      />
+                      <span className="slider"></span>
+                    </label>
                   </div>
-                  <label className="toggle-container">
-                    <input type="checkbox" checked={isHalfHalf} onChange={(e) => {
-                      setIsHalfHalf(e.target.checked);
-                      if(!e.target.checked) setSecondHalf(null);
-                    }} />
-                    <span className="toggle-slider"></span>
-                    <span className="toggle-label">Quero 2 sabores diferentes</span>
-                  </label>
-
-                  {isHalfHalf && (
-                    <div className="half-half-selection">
-                      <h4>Escolha a segunda metade:</h4>
-                      <div className="horizontal-scroll">
-                        {availableProducts
-                           .filter(p => p.categoryId === product.categoryId && p.id !== product.id)
-                           .map(p => (
-                          <div key={p.id} className={`half-card ${secondHalf?.id === p.id ? 'selected' : ''}`} onClick={() => setSecondHalf(p)}>
-                            <div className="half-card-img-placeholder"></div>
-                            <span>{p.name}</span>
-                          </div>
-                        ))}
+                  
+                  {isHalfAndHalf && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>Selecione o 2º Sabor:</p>
+                      
+                      <div style={{ position: 'relative' }}>
+                        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input 
+                          type="text" 
+                          placeholder="Buscar sabor..." 
+                          value={searchHalf}
+                          onChange={(e) => setSearchHalf(e.target.value)}
+                          style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '14px', outline: 'none' }}
+                        />
                       </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px', marginTop: '4px' }}>
+                        {availableProducts
+                          .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
+                          .map(p => {
+                            const isSelected = secondHalfProductId === p.id;
+                            const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
+                            
+                            return (
+                              <div 
+                                key={p.id} 
+                                onClick={() => setSecondHalfProductId(p.id)}
+                                style={{ 
+                                  display: 'flex', gap: '14px', padding: '14px', 
+                                  border: isSelected ? '1px solid #fb923c' : '1px solid rgba(255,255,255,0.05)', 
+                                  borderRadius: 'var(--radius-md)', 
+                                  backgroundColor: isSelected ? 'rgba(251,146,60,0.1)' : 'rgba(0,0,0,0.2)',
+                                  boxShadow: isSelected ? '0 4px 12px rgba(251,146,60,0.15)' : 'none',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s ease',
+                                  alignItems: 'center'
+                                }}
+                              >
+                                {img ? (
+                                  <img src={img} alt={p.name} style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                                ) : (
+                                  <div style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🍕</div>
+                                )}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
+                                  <span style={{ fontWeight: 600, fontSize: '15px', color: isSelected ? '#fb923c' : 'var(--text-primary)' }}>{p.name}</span>
+                                  {p.description && (
+                                    <span style={{ fontSize: '13px', color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{p.description}</span>
+                                  )}
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
+                                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${isSelected ? '#fb923c' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#fb923c' }} />}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        }
+                        
+                        {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).length === 0 && (
+                          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
+                            Nenhum sabor encontrado com "{searchHalf}"
+                          </div>
+                        )}
+                      </div>
+                      
+                      {loadingSecondHalf && (
+                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                          <div className="global-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
+                          Carregando informações do sabor...
+                        </div>
+                      )}
+                      
+                      {!loadingSecondHalf && secondHalfProductId && halfAndHalfExtraPrice > 0 && (
+                        <div style={{ fontSize: '13px', fontWeight: 500, color: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', padding: '12px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(251,146,60,0.2)' }}>
+                          <span style={{ fontSize: '16px' }}>💰</span> Será adicionado + R$ {halfAndHalfExtraPrice.toFixed(2)} pelo sabor mais caro.
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>
               )}
 
-              <section className="modal-section cross-sell">
-                <div className="section-header">
-                  <h3>Aproveite e leve bebidas</h3>
-                </div>
-                <div className="horizontal-scroll">
-                  {availableProducts
-                    .filter(p => p.categoryName?.toLowerCase().includes('bebida') || p.categoryName?.toLowerCase().includes('drink'))
-                    .map(drink => (
-                    <div key={drink.id} className={`drink-card ${selectedDrinks.find(d => d.id === drink.id) ? 'selected' : ''}`} onClick={() => toggleDrink(drink)}>
-                      <div className="drink-card-img-placeholder">🥤</div>
-                      <span className="name">{drink.name}</span>
-                      <span className="price">+ R$ {drink.price.toFixed(2)}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
+
 
               <section className="modal-section">
                 <div className="section-header">

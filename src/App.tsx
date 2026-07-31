@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import MenuPage from './pages/MenuPage';
 import OrderTrackerPage from './pages/OrderTrackerPage';
@@ -21,6 +21,20 @@ function App() {
   const [tenantNotFound, setTenantNotFound] = useState(false);
   const [tenantSuspended, setTenantSuspended] = useState(false);
   const [isValidating, setIsValidating] = useState(!superAdmin);
+
+  const hostname = window.location.hostname;
+  const isSubdomain = hostname.includes('.') && 
+                      !hostname.startsWith('www.') && 
+                      !hostname.startsWith('localhost') && 
+                      !hostname.startsWith('api.') && 
+                      !hostname.startsWith('admin.') && 
+                      !hostname.startsWith('superadmin.');
+
+  // Componente auxiliar para redirecionar mantendo a querystring (ex: ?t=token)
+  const RedirectWithQuery = () => {
+    const location = useLocation();
+    return <Navigate to={{ pathname: "/", search: location.search }} replace />;
+  };
 
   useEffect(() => {
     const handleNotFound = () => setTenantNotFound(true);
@@ -88,8 +102,7 @@ function App() {
   if (isValidating) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', backgroundColor: '#0f1115' }}>
-        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(255,126,95,0.2)', borderTopColor: '#ff7e5f', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <div className="global-spinner" />
       </div>
     );
   }
@@ -102,8 +115,12 @@ function App() {
         <Route path="/pedido" element={<MenuPage />} />
         
         {/* Rota de Fallback para localhost sem subdomínios (ex: localhost:3333/pizzariabrazil) */}
-        <Route path="/:tenantSlug" element={<MenuPage />} />
-        <Route path="/:tenantSlug/pedido" element={<MenuPage />} />
+        {!isSubdomain && (
+          <>
+            <Route path="/:tenantSlug" element={<MenuPage />} />
+            <Route path="/:tenantSlug/pedido" element={<MenuPage />} />
+          </>
+        )}
         
         <Route path="/tracker" element={<OrderTrackerPage />} />
         <Route path="/tracker/:orderId" element={<OrderTrackerPage />} />
@@ -116,7 +133,7 @@ function App() {
           <Route path="settings" element={<SettingsManager />} />
         </Route>
         
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<RedirectWithQuery />} />
       </Routes>
     </BrowserRouter>
   );

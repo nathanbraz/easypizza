@@ -3,6 +3,7 @@ import { X, CheckCircle, Ticket, MapPin, ChevronRight, ChevronLeft, Trash2, Plus
 import { api } from '../../lib/api';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './CheckoutModal.css';
+import ProductModal from '../ProductModal';
 
 interface CheckoutModalProps {
   cart: any[];
@@ -23,10 +24,14 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
   const [couponError, setCouponError] = useState('');
   const [couponSuccess, setCouponSuccess] = useState('');
 
+  // Cross Sell Product Modal
+  const [crossSellProduct, setCrossSellProduct] = useState<any>(null);
+
   // Delivery (1) or Pickup (2)
   const [orderType, setOrderType] = useState<number>(storeSettings?.acceptingDelivery ? 1 : (storeSettings?.acceptingPickup ? 2 : 1));
   const [paymentTypeId, setPaymentTypeId] = useState<string>('');
   const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
+  const [changeFor, setChangeFor] = useState<string>('');
 
   React.useEffect(() => {
     const fetchPaymentTypes = async () => {
@@ -46,7 +51,15 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [cep, setCep] = useState(() => customerInfo?.defaultAddress?.zipCode || '');
+  const [cep, setCep] = useState(() => {
+    let initialCep = customerInfo?.defaultAddress?.zipCode || '76400000';
+    let raw = initialCep.replace(/\D/g, '');
+    if (raw.length > 5) {
+      return raw.substring(0, 5) + '-' + raw.substring(5, 8);
+    }
+    return raw;
+  });
+  const [isNoNumber, setIsNoNumber] = useState(false);
   const [address, setAddress] = useState(() => {
     if (customerInfo?.defaultAddress) {
       return {
@@ -54,9 +67,11 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
         number: customerInfo.defaultAddress.number || '',
         neighborhood: customerInfo.defaultAddress.neighborhood || '',
         city: customerInfo.defaultAddress.city || '',
+        state: customerInfo.defaultAddress.state || '',
+        referencePoint: customerInfo.defaultAddress.complement ? customerInfo.defaultAddress.complement.replace('Ref: ', '') : ''
       };
     }
-    return { street: '', number: '', neighborhood: '', city: '' };
+    return { street: '', number: '', neighborhood: '', city: '', state: '', referencePoint: '' };
   });
   const [latitude, setLatitude] = useState<number | null>(() => customerInfo?.defaultAddress?.latitude || null);
   const [longitude, setLongitude] = useState<number | null>(() => customerInfo?.defaultAddress?.longitude || null);
@@ -107,28 +122,27 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
   };
 
   const addDrinkToCart = (drink: any) => {
-    const existingIndex = cart.findIndex(item => 
-      item.baseProduct.id === drink.id && 
-      !item.isHalfHalf && 
-      !item.observation && 
-      (!item.selectedOptions || item.selectedOptions.length === 0)
-    );
-
-    if (existingIndex >= 0) {
-      updateItemQuantity(existingIndex, 1);
-    } else {
-      const newItem = {
-        baseProduct: drink,
-        quantity: 1,
-        finalPrice: drink.price,
-      };
-      updateCart([...cart, newItem]);
-    }
+    // Open product modal to allow size/option selection
+    setCrossSellProduct(drink);
   };
 
   const fetchAddressByCep = async (cepCode: string) => {
-    if(cepCode.length >= 8) {
-       setAddress({ street: 'Av. Paulista', number: '', neighborhood: 'Bela Vista', city: 'São Paulo' });
+    if(cepCode.length === 8) {
+       try {
+         const response = await fetch(`https://viacep.com.br/ws/${cepCode}/json/`);
+         const data = await response.json();
+         if (!data.erro) {
+           setAddress(prev => ({
+             ...prev,
+             street: data.logradouro || '',
+             neighborhood: data.bairro || '',
+             city: data.localidade || '',
+             state: data.uf || ''
+           }));
+         }
+       } catch (error) {
+         console.error("Erro ao buscar CEP", error);
+       }
     }
   };
 
@@ -208,19 +222,19 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
       // Se for delivery, salva/atualiza endereço do cliente
       if (orderType === 1) {
-        if (!address.street || !address.number || !address.neighborhood) {
+        if (!address.street || (!address.number && !isNoNumber) || !address.neighborhood) {
           alert("Por favor, preencha a rua, número e bairro do endereço.");
           return;
         }
         try {
           const addrPayload = {
             street: address.street,
-            number: address.number,
+            number: isNoNumber ? 'SN' : address.number,
             neighborhood: address.neighborhood,
-            city: address.city || 'São Paulo',
-            state: 'SP',
+            city: address.city,
+            state: address.state || 'SP',
             zipCode: cep || '00000000',
-            complement: '',
+            complement: address.referencePoint ? `Ref: ${address.referencePoint}` : '',
             latitude: latitude,
             longitude: longitude
           };
@@ -239,34 +253,40 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       }
 
       // POST order to API
+      const itemsPayload = cart.map(item => ({
+        productId: item.baseProduct.id,
+        quantity: item.quantity,
+        unitPrice: item.finalPrice / item.quantity,
+        notes: item.observation || null,
+        addons: [
+          // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.)
+          ...(item.selectedOptions?.map((opt: any) => ({
+            productOptionItemId: opt.id || null,
+            addonName: opt.name,
+            price: opt.additionalPrice || 0,
+            quantity: opt.quantity || 1
+          })) || []),
+          // Bebidas selecionadas no modal do produto (cross-sell)
+          ...(item.selectedDrinks?.map((d: any) => ({
+            productOptionItemId: null,
+            addonName: d.name,
+            price: d.price || 0,
+            quantity: 1
+          })) || [])
+        ]
+      }));
+      
+      const selectedPayment = paymentTypes.find(pt => pt.id === paymentTypeId);
+      const isCash = selectedPayment && selectedPayment.name.toLowerCase().includes('dinheiro');
+
       const orderPayload = {
         customerId: customerId,
         customerAddressId: orderType === 1 ? addrId : null,
         type: orderType,
         paymentTypeId: paymentTypeId,
         couponCode: couponCode || null,
-        items: cart.map(item => ({
-          productId: item.baseProduct.id,
-          quantity: item.quantity,
-          unitPrice: item.finalPrice / item.quantity,
-          notes: item.observation || null,
-          addons: [
-            // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.)
-            ...(item.selectedOptions?.map((opt: any) => ({
-              productOptionItemId: opt.id || null,
-              addonName: opt.name,
-              price: opt.additionalPrice || 0,
-              quantity: opt.quantity || 1
-            })) || []),
-            // Bebidas selecionadas no modal do produto (cross-sell)
-            ...(item.selectedDrinks?.map((d: any) => ({
-              productOptionItemId: null,
-              addonName: d.name,
-              price: d.price || 0,
-              quantity: 1
-            })) || [])
-          ]
-        }))
+        changeFor: (isCash && changeFor) ? Number(changeFor) : null,
+        items: itemsPayload
       };
       
       const res = await api.post(`/orders/${tenantSlug}`, orderPayload);
@@ -300,8 +320,8 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
              <ChevronRight size={14} color="#64748b" />
              <div className={`step ${step >= 3 ? 'active' : ''}`}>Pagamento</div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <h2 style={{ margin: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '40px' }}>
+            <h2>
               {step === 1 && 'Seu Carrinho'}
               {step === 2 && 'Onde vamos entregar?'}
               {step === 3 && 'Finalizar Pedido'}
@@ -317,7 +337,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                 }} 
                 style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239,68,68,0.2)', padding: '6px 12px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontSize: '13px', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
               >
-                <Trash2 size={14} /> Limpar Sacola
+                <Trash2 size={14} /> Limpar Carrinho
               </button>
             )}
           </div>
@@ -329,28 +349,51 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
           {step === 1 && (
              <div className="step-content animate-fade-in">
                <div className="rich-cart-items">
-                 {cart.map((item, index) => (
+                 {cart.map((item, index) => {
+                   const halfOption = item.selectedOptions?.find((opt: any) => opt.groupName === 'Meio a Meio');
+                   const isHalf = !!halfOption;
+                   
+                   let title = item.baseProduct.name;
+                   let description = item.baseProduct.description;
+                   
+                   if (isHalf) {
+                     let halfDesc = halfOption.description;
+                     if (!halfDesc) {
+                       const originalName = halfOption.name.replace('1/2 ', '').replace('Meia ', '');
+                       const foundProduct = availableProducts.find(p => p.name === originalName);
+                       if (foundProduct) halfDesc = foundProduct.description;
+                     }
+
+                     title = `Meia ${item.baseProduct.name} & ${halfOption.name.replace('1/2 ', 'Meia ')}`;
+                     description = `Metade 1: ${item.baseProduct.description || 'Sem descrição'}\nMetade 2: ${halfDesc || 'Sem descrição'}`;
+                   }
+
+                   const img = item.baseProduct.imageUrl || (item.baseProduct.imageUrls && item.baseProduct.imageUrls.length > 0 ? item.baseProduct.imageUrls[0] : null);
+
+                   return (
                    <div key={index} className="rich-cart-item">
                      <div className="rich-cart-item-main">
                        <div className="rich-cart-image">
-                         {item.baseProduct.imageUrl ? (
-                           <img src={item.baseProduct.imageUrl} alt={item.baseProduct.name} />
+                         {img ? (
+                           <img src={img} alt={item.baseProduct.name} />
                          ) : (
-                           <div className="img-placeholder">🍕</div>
+                           <div className="img-placeholder">
+                             {item.baseProduct.categoryName?.toLowerCase().includes('bebida') ? '🥤' : '🍕'}
+                           </div>
                          )}
                        </div>
                        <div className="rich-cart-details">
-                         <h4>{item.baseProduct.name}</h4>
+                         <h4 style={{ lineHeight: '1.2', paddingBottom: '4px' }}>{title}</h4>
                          {item.size && <span className="cart-badge">{item.size.name}</span>}
                          <div className="cart-price">R$ {item.finalPrice.toFixed(2)}</div>
                        </div>
                      </div>
                      
                      <div className="rich-cart-customizations">
-                       {item.baseProduct.description && <div className="custom-item description">Ingredientes: {item.baseProduct.description}</div>}
-                       {item.isHalfHalf && <div className="custom-item highlight">• 1/2 {item.secondHalf?.name}</div>}
+                       {description && <div className="custom-item description" style={{ whiteSpace: 'pre-line' }}>{isHalf ? '' : 'Ingredientes: '}{description}</div>}
+
                        
-                       {item.selectedOptions && item.selectedOptions.map((opt: any, idx: number) => (
+                       {item.selectedOptions && item.selectedOptions.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any, idx: number) => (
                           <div key={idx} className="custom-item addon">• {opt.groupName}: {opt.name} {opt.additionalPrice > 0 ? `(+R$ ${opt.additionalPrice.toFixed(2)})` : ''}</div>
                        ))}
                        
@@ -372,27 +415,74 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                        </button>
                      </div>
                    </div>
-                 ))}
+                 )})}
                </div>
 
                {/* Cross-Sell Bebidas */}
-               {availableProducts.filter(p => p.categoryName?.toLowerCase().includes('bebida') || p.categoryName?.toLowerCase().includes('drink')).length > 0 && (
-                 <div className="cross-sell-section">
-                   <h3 className="cross-sell-title">Aproveite e leve também:</h3>
-                   <div className="horizontal-scroll">
-                     {availableProducts
-                       .filter(p => p.categoryName?.toLowerCase().includes('bebida') || p.categoryName?.toLowerCase().includes('drink'))
-                       .map(drink => (
-                         <div key={drink.id} className="cross-sell-card" onClick={() => addDrinkToCart(drink)}>
-                           <div className="cross-sell-img">🥤</div>
-                           <span className="cross-sell-name">{drink.name}</span>
-                           <span className="cross-sell-price">+ R$ {drink.price.toFixed(2)}</span>
-                           <button className="cross-sell-add"><Plus size={14} /> Adicionar</button>
-                         </div>
-                       ))}
+               {(() => {
+                 const hasDrinkInCart = cart.some(item => 
+                   item.baseProduct.categoryName?.toLowerCase().includes('bebida') || 
+                   item.baseProduct.categoryName?.toLowerCase().includes('drink') || 
+                   (item.selectedDrinks && item.selectedDrinks.length > 0)
+                 );
+                 
+                 if (hasDrinkInCart) return null;
+
+                 const availableDrinks = availableProducts.filter(p => p.showInCrossSell === true);
+                 
+                 if (availableDrinks.length === 0) return null;
+
+                 return (
+                   <div className="cross-sell-section">
+                     <h3 className="cross-sell-title">Aproveite e leve também:</h3>
+                     <div className="horizontal-scroll">
+                        {availableDrinks.map(drink => {
+                          let displayPrice = `+ R$ ${drink.price.toFixed(2)}`;
+                          
+                          if (drink.price === 0) {
+                            let minAdditionalPrice = 0;
+                            let hasMandatoryOptions = false;
+                            
+                            if (drink.optionGroups && drink.optionGroups.length > 0) {
+                              drink.optionGroups.forEach((group: any) => {
+                                if (group.minChoices > 0 && group.options && group.options.length > 0) {
+                                  hasMandatoryOptions = true;
+                                  const cheapestOption = Math.min(...group.options.map((o: any) => o.additionalPrice));
+                                  minAdditionalPrice += (cheapestOption * group.minChoices);
+                                }
+                              });
+                            }
+                            
+                            if (hasMandatoryOptions && minAdditionalPrice > 0) {
+                              displayPrice = `A partir de R$ ${minAdditionalPrice.toFixed(2)}`;
+                            } else if (drink.optionGroups && drink.optionGroups.length > 0) {
+                              displayPrice = 'Ver opções';
+                            } else {
+                              displayPrice = 'Grátis';
+                            }
+                          }
+                          
+                          const img = drink.imageUrl || (drink.imageUrls && drink.imageUrls.length > 0 ? drink.imageUrls[0] : null);
+                          
+                          return (
+                            <div key={drink.id} className="cross-sell-card" onClick={() => addDrinkToCart(drink)}>
+                              <div className="cross-sell-img" style={img ? { padding: 0 } : {}}>
+                                {img ? (
+                                  <img src={img} alt={drink.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                ) : (
+                                  drink.categoryName?.toLowerCase().includes('bebida') ? '🥤' : '🍟'
+                                )}
+                              </div>
+                              <span className="cross-sell-name">{drink.name}</span>
+                              <span className="cross-sell-price">{displayPrice}</span>
+                              <button className="cross-sell-add"><Plus size={14} /> Adicionar</button>
+                            </div>
+                          );
+                        })}
+                      </div>
                    </div>
-                 </div>
-               )}
+                 );
+               })()}
              </div>
           )}
 
@@ -408,9 +498,14 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                        type="text" 
                        placeholder="00000-000" 
                        value={cep} 
+                       maxLength={9}
                        onChange={(e) => {
-                         setCep(e.target.value);
-                         fetchAddressByCep(e.target.value.replace(/\D/g, ''));
+                         let val = e.target.value.replace(/\D/g, '');
+                         if (val.length > 5) val = val.substring(0, 5) + '-' + val.substring(5, 8);
+                         setCep(val);
+                         if (val.replace(/\D/g, '').length === 8) {
+                           fetchAddressByCep(val.replace(/\D/g, ''));
+                         }
                        }}
                      />
                    </div>
@@ -421,21 +516,45 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                      <label>Rua</label>
                      <input type="text" value={address.street} onChange={e => setAddress({...address, street: e.target.value})} />
                    </div>
-                   <div className="form-group" style={{flex: 1}}>
-                     <label>Número</label>
-                     <input type="text" value={address.number} onChange={e => setAddress({...address, number: e.target.value})} />
-                   </div>
+                    <div className="form-group" style={{flex: 1}}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <label style={{ margin: 0 }}>Número</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontSize: '0.8rem', color: isNoNumber ? 'var(--primary)' : 'var(--text-muted)', fontWeight: isNoNumber ? 'bold' : 'normal', transition: '0.2s' }}>Sem Nº</span>
+                          <label className="custom-toggle">
+                            <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
+                            <span className="custom-toggle-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                      <input 
+                        type="text" 
+                        disabled={isNoNumber} 
+                        value={isNoNumber ? 'SN' : address.number} 
+                        onChange={e => setAddress({...address, number: e.target.value})} 
+                        style={isNoNumber ? { opacity: 0.7 } : {}} 
+                      />
+                    </div>
                  </div>
                  
                  <div className="form-row">
-                   <div className="form-group">
+                   <div className="form-group" style={{flex: 2}}>
                      <label>Bairro</label>
                      <input type="text" value={address.neighborhood} onChange={e => setAddress({...address, neighborhood: e.target.value})} />
                    </div>
-                   <div className="form-group">
+                   <div className="form-group" style={{flex: 2}}>
                      <label>Cidade</label>
                      <input type="text" value={address.city} onChange={e => setAddress({...address, city: e.target.value})} />
                    </div>
+                   <div className="form-group" style={{flex: 1}}>
+                     <label>UF</label>
+                     <input type="text" value={address.state} onChange={e => setAddress({...address, state: e.target.value})} maxLength={2} style={{ textTransform: 'uppercase' }} />
+                   </div>
+                 </div>
+
+                 <div className="form-group">
+                   <label>Ponto de Referência (Opcional)</label>
+                   <input type="text" placeholder="Ex: Próximo ao supermercado" value={address.referencePoint} onChange={e => setAddress({...address, referencePoint: e.target.value})} />
                  </div>
                   
                   <div className="form-group" style={{ marginTop: '16px' }}>
@@ -480,7 +599,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                            {item.selectedOptions && item.selectedOptions.map((opt: any, idx: number) => (
                              <span key={idx} style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{opt.name}</span>
                            ))}
-                           {item.isHalfHalf && <span style={{ fontSize: '0.8rem', color: '#fbbf24' }}>1/2 {item.secondHalf?.name}</span>}
+
                          </div>
                        </div>
                        <span style={{ fontWeight: 'bold' }}>R$ {item.finalPrice.toFixed(2)}</span>
@@ -529,6 +648,28 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                     {paymentTypes.filter(pt => pt.isActive).length === 0 && (
                       <div style={{ padding: '12px', color: '#94a3b8', fontStyle: 'italic' }}>Nenhuma forma de pagamento disponível no momento.</div>
                     )}
+                    
+                    {(() => {
+                      const selectedPayment = paymentTypes.find(pt => pt.id === paymentTypeId);
+                      const isCash = selectedPayment && selectedPayment.name.toLowerCase().includes('dinheiro');
+                      
+                      if (isCash) {
+                        return (
+                          <div style={{ marginTop: '8px', background: 'rgba(255, 87, 34, 0.05)', padding: '16px', borderRadius: '8px', border: '1px dashed rgba(255, 87, 34, 0.3)' }} className="animate-fade-in">
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>Troco para: (Opcional)</label>
+                            <input 
+                              type="text" 
+                              placeholder="Ex: 50" 
+                              value={changeFor} 
+                              onChange={(e) => setChangeFor(e.target.value.replace(/\D/g, ''))}
+                              style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.2)', color: 'white' }}
+                            />
+                            <span style={{ display: 'block', marginTop: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>Deixe em branco se não precisar de troco.</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </section>
 
@@ -598,6 +739,18 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
           )}
         </div>
       </div>
+      
+      {crossSellProduct && (
+        <ProductModal 
+          product={crossSellProduct}
+          availableProducts={availableProducts}
+          onClose={() => setCrossSellProduct(null)}
+          onAddToCart={(item) => {
+             updateCart([...cart, item]);
+             setCrossSellProduct(null);
+          }}
+        />
+      )}
     </div>
   );
 }

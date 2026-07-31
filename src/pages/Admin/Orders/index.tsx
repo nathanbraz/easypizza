@@ -45,6 +45,7 @@ interface Order {
   paymentType?: {
     name?: string;
   };
+  changeFor?: number;
   items?: OrderItem[];
 }
 
@@ -123,17 +124,43 @@ export default function OrdersDashboard() {
     return '#' + id;
   };
 
+  const formatPhone = (phone: string | undefined) => {
+    if (!phone) return 'Não informado';
+    let cleaned = ('' + phone).replace(/\D/g, '');
+    if (cleaned.startsWith('55') && cleaned.length > 11) cleaned = cleaned.substring(2);
+    if (cleaned.length === 11) {
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 7)}-${cleaned.substring(7)}`;
+    } else if (cleaned.length === 10) {
+      return `(${cleaned.substring(0, 2)}) ${cleaned.substring(2, 6)}-${cleaned.substring(6)}`;
+    }
+    return phone;
+  };
+
+  const formatCurrency = (val: string | number) => Number(val).toFixed(2).replace('.', ',');
+
   const printOrderTicket = (order: Order) => {
     const isPickup = Number(order.type) === 2 || order.type === 'Pickup';
     const createdAtStr = new Date(order.createdAt).toLocaleString('pt-BR');
-    const customerPhone = order.customer?.phoneNumber || order.customer?.PhoneNumber || 'Não informado';
+    const customerPhone = formatPhone(order.customer?.phoneNumber || order.customer?.PhoneNumber);
     
     let addressHtml = '<div class="text-center bold" style="margin: 4px 0;">RETIRADA NO BALCÃO</div>';
     if (!isPickup && order.address) {
+      let street = order.address.street || '';
+      if (street.match(/^\d+\.\s/)) street = street.replace(/^\d+\.\s/, '');
+
+      let compLine = '';
+      if (order.address.complement) {
+         if (order.address.complement.startsWith('Ref:')) {
+            compLine = `<div>${order.address.complement}</div>`;
+         } else {
+            compLine = `<div>Compl: ${order.address.complement}</div>`;
+         }
+      }
+
       addressHtml = `
         <div class="bold" style="margin-top: 4px;">ENTREGA EM DOMICÍLIO:</div>
-        <div>${order.address.street || ''}, nº ${order.address.number || 'S/N'}</div>
-        ${order.address.complement ? `<div>Compl: ${order.address.complement}</div>` : ''}
+        <div>${street}, nº ${order.address.number || 'S/N'}</div>
+        ${compLine}
         <div>Bairro: ${order.address.neighborhood || ''}</div>
         <div>Cidade: ${order.address.city || ''}</div>
       `;
@@ -142,12 +169,12 @@ export default function OrdersDashboard() {
     let itemsHtml = '';
     if (order.items && order.items.length > 0) {
       order.items.forEach(item => {
-        const itemTotal = (item.quantity * Number(item.unitPrice || 0)).toFixed(2);
+        const itemTotal = formatCurrency(item.quantity * Number(item.unitPrice || 0));
         const addonsHtml = item.addons && item.addons.length > 0
           ? item.addons.map(a => {
               const qty = a.quantity && a.quantity > 1 ? `${a.quantity}x ` : '';
-              const price = Number(a.price) > 0 ? ` (+R$ ${Number(a.price).toFixed(2)})` : '';
-              return `<tr><td></td><td style="font-size:11px;color:#555;">  ↳ ${qty}${a.addonName}${price}</td><td></td></tr>`;
+              const priceText = Number(a.price) > 0 ? `+R$ ${formatCurrency(a.price)}` : '';
+              return `<tr><td></td><td style="font-size:11px;color:#555;display:flex;justify-content:space-between;"><span>  ↳ ${qty}${a.addonName}</span><span>${priceText}</span></td><td></td></tr>`;
             }).join('')
           : '';
         const notesHtml = item.notes
@@ -167,10 +194,10 @@ export default function OrdersDashboard() {
       itemsHtml = '<tr><td colspan="3" class="text-center">Nenhum item</td></tr>';
     }
 
-    const subTotal = Number(order.subTotal || 0).toFixed(2);
-    const deliveryFee = Number(order.deliveryFee || 0).toFixed(2);
-    const discount = Number(order.discountAmount || 0).toFixed(2);
-    const total = Number(order.totalAmount ?? order.subTotal ?? 0).toFixed(2);
+    const subTotal = formatCurrency(order.subTotal || 0);
+    const deliveryFee = formatCurrency(order.deliveryFee || 0);
+    const discount = formatCurrency(order.discountAmount || 0);
+    const total = formatCurrency(order.totalAmount ?? order.subTotal ?? 0);
 
     const ticketHtml = `
       <!DOCTYPE html>
@@ -249,6 +276,7 @@ export default function OrdersDashboard() {
         <div class="divider"></div>
         <div class="bold">PAGAMENTO:</div>
         <div>Forma: ${order.paymentType?.name?.toUpperCase() || 'NÃO INFORMADO'}</div>
+        ${order.changeFor ? `<div>Troco para: R$ ${formatCurrency(order.changeFor)}</div>` : ''}
         
         <div class="divider"></div>
         <div class="text-center" style="margin-top: 8px; font-size: 11px;">*** OBRIGADO PELA PREFERÊNCIA! ***</div>
