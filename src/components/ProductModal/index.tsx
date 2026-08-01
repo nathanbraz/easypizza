@@ -24,7 +24,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({});
 
   // Cross-sell Drinks
-  const [selectedDrinks, setSelectedDrinks] = useState<any[]>([]);
+  const [selectedDrinks] = useState<any[]>([]);
   const [observation, setObservation] = useState('');
   const [quantity, setQuantity] = useState(1);
 
@@ -145,10 +145,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       if (totalInGroup > groupMax) return prev; // Exceeded group max
       return { ...prev, [itemId]: newQty };
     });
-  };
-
-  const toggleDrink = (drink: any) => {
-    setSelectedDrinks(prev => prev.find(d => d.id === drink.id) ? prev.filter(d => d.id !== drink.id) : [...prev, drink]);
   };
 
   // Pricing Logic
@@ -298,7 +294,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                   selectedCount = (selections[group.id] || []).length;
                 }
                 const isGroupValid = selectedCount >= group.minChoices;
-                const isMaxReached = selectedCount >= group.maxChoices;
 
                 return (
                   <section key={group.id} className="modal-section">

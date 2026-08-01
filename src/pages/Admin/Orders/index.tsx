@@ -85,7 +85,9 @@ export default function OrdersDashboard() {
   };
 
   const getOrdersByColumn = (colId: ColumnStatus) => {
-    return orders.filter(o => getColumnForStatus(o.status) === colId);
+    return orders
+      .filter(o => getColumnForStatus(o.status) === colId)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   };
 
   const moveOrder = async (orderId: string | number, nextStatus: number) => {

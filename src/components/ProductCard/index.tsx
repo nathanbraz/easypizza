@@ -29,11 +29,11 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
     let hasMandatoryOptions = false;
 
     if (product.optionGroups && product.optionGroups.length > 0) {
-      product.optionGroups.forEach(group => {
+      product.optionGroups.forEach((group: any) => {
         if (group.minChoices > 0 && group.options && group.options.length > 0) {
           hasMandatoryOptions = true;
           // Encontra a opção mais barata deste grupo obrigatório
-          const cheapestOption = Math.min(...group.options.map(o => o.additionalPrice));
+          const cheapestOption = Math.min(...group.options.map((o: any) => o.additionalPrice));
           minAdditionalPrice += (cheapestOption * group.minChoices);
         }
       });

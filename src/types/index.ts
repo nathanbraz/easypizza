@@ -17,6 +17,7 @@ export interface Product {
   addons?: ProductAddon[]; // Injetado pelo frontend
   categoryName?: string; // Campo opcional para facilitar a UI
   allowsHalfAndHalf?: boolean; // Injetado pelo frontend (da categoria)
+  optionGroups?: any[];
 }
 
 export interface ProductCategory {

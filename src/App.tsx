@@ -12,7 +12,7 @@ import SettingsManager from './pages/Admin/Settings';
 import SuperAdminLayout from './pages/SuperAdmin/Layout/SuperAdminLayout';
 import TenantsDashboard from './pages/SuperAdmin/Tenants';
 import SuperAdminDashboard from './pages/SuperAdmin/Dashboard';
-import { isSuperAdmin, api } from './lib/api';
+import { isSuperAdmin, api, getTenantSlugFromUrl } from './lib/api';
 
 import './index.css';
 
@@ -45,7 +45,8 @@ function App() {
     
     // Dispara uma requisição leve apenas para validar o tenant antes de renderizar a UI
     if (!superAdmin) {
-      api.get('/menu') // endpoint público e real (MenuController)
+      const slug = getTenantSlugFromUrl();
+      api.get(`/menu/${slug}`) // endpoint público e real (MenuController)
         .then(() => setIsValidating(false))
         .catch(() => {
           // O catch é tratado pelo interceptor (api.ts) que vai disparar os eventos
