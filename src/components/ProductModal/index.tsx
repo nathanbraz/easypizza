@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Plus, Minus, Search } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Plus, Minus, Search, CheckCircle2 } from 'lucide-react';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './ProductModal.css';
@@ -34,6 +34,33 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   const [secondHalfOptions, setSecondHalfOptions] = useState<any[]>([]);
   const [loadingSecondHalf, setLoadingSecondHalf] = useState(false);
   const [searchHalf, setSearchHalf] = useState('');
+
+  // Drag to scroll
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+  const [dragDist, setDragDist] = useState(0);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!carouselRef.current) return;
+    setIsDragging(true);
+    setDragDist(0);
+    setStartX(e.pageX - carouselRef.current.offsetLeft);
+    setScrollLeft(carouselRef.current.scrollLeft);
+  };
+
+  const handleMouseLeave = () => setIsDragging(false);
+  const handleMouseUp = () => setIsDragging(false);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !carouselRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - carouselRef.current.offsetLeft;
+    const walk = (x - startX) * 2;
+    setDragDist(Math.abs(walk));
+    carouselRef.current.scrollLeft = scrollLeft - walk;
+  };
 
   useLockBodyScroll();
 
@@ -361,88 +388,133 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
 
               {/* Half and Half UI Section */}
               {(product as any).allowsHalfAndHalf && (
-                <section className="modal-section" style={{ background: 'linear-gradient(145deg, rgba(251,146,60,0.08) 0%, rgba(251,146,60,0.02) 100%)', border: '1px solid rgba(251,146,60,0.2)', borderRadius: 'var(--radius-lg)', padding: '20px', marginTop: '24px', marginBottom: '24px' }}>
-                  <div className="section-header" style={{ marginBottom: isHalfAndHalf ? '20px' : '0', padding: 0 }}>
-                    <div>
-                      <h3 style={{ color: '#fb923c', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>🍕 Dividir Sabores (Meio a Meio)?</h3>
-                      <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.7)' }}>Escolha outro sabor para dividir a pizza.</p>
-                    </div>
-                    <label className="toggle-switch">
-                      <input 
-                        type="checkbox" 
-                        checked={isHalfAndHalf} 
-                        onChange={(e) => {
-                          setIsHalfAndHalf(e.target.checked);
-                          if (!e.target.checked) setSecondHalfProductId('');
-                        }} 
-                      />
-                      <span className="slider"></span>
-                    </label>
+                <section className="highlight-section" style={{ marginTop: '24px', marginBottom: '24px', paddingBottom: '32px' }}>
+                  {/* Tab Switcher */}
+                  <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-full)', padding: '6px', marginBottom: '20px' }}>
+                    <button 
+                      onClick={() => { setIsHalfAndHalf(false); setSecondHalfProductId(''); }}
+                      style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: !isHalfAndHalf ? 'var(--primary)' : 'transparent', color: !isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                    >
+                      🍕 Inteira
+                    </button>
+                    <button 
+                      onClick={() => setIsHalfAndHalf(true)}
+                      style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: isHalfAndHalf ? 'var(--primary)' : 'transparent', color: isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                    >
+                      🌗 Meio a Meio
+                    </button>
                   </div>
                   
                   {isHalfAndHalf && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                      <p style={{ fontSize: '14px', fontWeight: 600, margin: '0 0 4px 0', color: 'var(--text-primary)' }}>Selecione o 2º Sabor:</p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                       
-                      <div style={{ position: 'relative' }}>
-                        <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                        <input 
-                          type="text" 
-                          placeholder="Buscar sabor..." 
-                          value={searchHalf}
-                          onChange={(e) => setSearchHalf(e.target.value)}
-                          style={{ width: '100%', padding: '12px 12px 12px 40px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(0,0,0,0.2)', color: 'white', fontSize: '14px', outline: 'none' }}
-                        />
-                      </div>
+                      {/* Metade 2 (Seleção) */}
+                      <div>
+                        <p style={{ fontSize: '17px', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          Escolha a 2ª Metade
+                        </p>
+                        
+                        <div style={{ position: 'relative', marginBottom: '16px' }}>
+                          <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                          <input 
+                            type="text" 
+                            placeholder="Buscar sabor para a 2ª metade..." 
+                            value={searchHalf}
+                            onChange={(e) => setSearchHalf(e.target.value)}
+                            style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '15px', outline: 'none', transition: 'all 0.2s ease' }}
+                            onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                          />
+                        </div>
 
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '8px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px', marginTop: '4px' }}>
-                        {availableProducts
-                          .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
-                          .map(p => {
-                            const isSelected = secondHalfProductId === p.id;
-                            const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
-                            
-                            return (
-                              <div 
-                                key={p.id} 
-                                onClick={() => setSecondHalfProductId(p.id)}
-                                style={{ 
-                                  display: 'flex', gap: '14px', padding: '14px', 
-                                  border: isSelected ? '1px solid #fb923c' : '1px solid rgba(255,255,255,0.05)', 
-                                  borderRadius: 'var(--radius-md)', 
-                                  backgroundColor: isSelected ? 'rgba(251,146,60,0.1)' : 'rgba(0,0,0,0.2)',
-                                  boxShadow: isSelected ? '0 4px 12px rgba(251,146,60,0.15)' : 'none',
-                                  cursor: 'pointer',
-                                  transition: 'all 0.2s ease',
-                                  alignItems: 'center'
-                                }}
-                              >
-                                {img ? (
-                                  <img src={img} alt={p.name} style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
-                                ) : (
-                                  <div style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '28px' }}>🍕</div>
-                                )}
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flex: 1 }}>
-                                  <span style={{ fontWeight: 600, fontSize: '15px', color: isSelected ? '#fb923c' : 'var(--text-primary)' }}>{p.name}</span>
-                                  {p.description && (
-                                    <span style={{ fontSize: '13px', color: isSelected ? 'rgba(255,255,255,0.85)' : 'var(--text-muted)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.4' }}>{p.description}</span>
+                        <div 
+                          ref={carouselRef}
+                          className="hide-scrollbar" 
+                          style={{ 
+                            display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px', 
+                            scrollSnapType: isDragging ? 'none' : 'x mandatory', 
+                            margin: '0 -24px', padding: '0 24px 16px 24px', 
+                            scrollBehavior: isDragging ? 'auto' : 'smooth', 
+                            cursor: isDragging ? 'grabbing' : 'grab' 
+                          }}
+                          onMouseDown={handleMouseDown}
+                          onMouseLeave={handleMouseLeave}
+                          onMouseUp={handleMouseUp}
+                          onMouseMove={handleMouseMove}
+                        >
+                          {availableProducts
+                            .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
+                            .map(p => {
+                              const isSelected = secondHalfProductId === p.id;
+                              const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
+                              
+                              const sizeOption = selectedOptionObjects.find(opt => opt.groupName.toLowerCase().includes('tamanho') || opt.groupName.toLowerCase().includes('size'));
+                              const estimatedFlavorPrice = p.price + (sizeOption ? (sizeOption.additionalPrice || 0) : 0);
+                              
+                              return (
+                                <div 
+                                  key={p.id} 
+                                  onClick={() => {
+                                    if (dragDist > 10) return;
+                                    setSecondHalfProductId(isSelected ? '' : p.id);
+                                  }}
+                                  style={{ 
+                                    flex: '0 0 calc(95% - 16px)',
+                                    minWidth: '360px',
+                                    scrollSnapAlign: 'start',
+                                    display: 'flex', gap: '14px', padding: '16px', 
+                                    border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.05)', 
+                                    borderRadius: 'var(--radius-md)', 
+                                    backgroundColor: isSelected ? 'rgba(255,87,34,0.08)' : 'rgba(0,0,0,0.2)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s ease',
+                                    alignItems: 'center',
+                                    userSelect: 'none'
+                                  }}
+                                >
+                                  {img ? (
+                                    <img src={img} alt={p.name} draggable={false} style={{ width: '84px', height: '84px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+                                  ) : (
+                                    <div style={{ width: '84px', height: '84px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', flexShrink: 0 }}>🍕</div>
                                   )}
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', paddingLeft: '8px' }}>
-                                  <div style={{ width: '22px', height: '22px', borderRadius: '50%', border: `2px solid ${isSelected ? '#fb923c' : 'rgba(255,255,255,0.2)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                    {isSelected && <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#fb923c' }} />}
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                                    <span style={{ fontWeight: 700, fontSize: '18px', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{p.name}</span>
+                                    {p.description && (
+                                      <span style={{ 
+                                        fontSize: '14px', 
+                                        color: isSelected ? 'rgba(255,255,255,0.95)' : 'var(--text-muted)', 
+                                        lineHeight: '1.3'
+                                      }}>
+                                        {p.description}
+                                      </span>
+                                    )}
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+                                      <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {estimatedFlavorPrice.toFixed(2)}</span>
+                                      {sizeOption && (
+                                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                          Tam: {sizeOption.name}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div style={{ paddingLeft: '4px', flexShrink: 0 }}>
+                                    {isSelected ? (
+                                      <CheckCircle2 size={28} color="var(--primary)" />
+                                    ) : (
+                                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
+                                    )}
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })
-                        }
-                        
-                        {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).length === 0 && (
-                          <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
-                            Nenhum sabor encontrado com "{searchHalf}"
-                          </div>
-                        )}
+                              );
+                            })
+                          }
+                          
+                          {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).length === 0 && (
+                            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
+                              Nenhum sabor encontrado com "{searchHalf}"
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       {loadingSecondHalf && (
@@ -452,9 +524,13 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                         </div>
                       )}
                       
+                      <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginTop: '8px', textAlign: 'center' }}>
+                        💡 O valor da pizza meio a meio será calculado pelo sabor mais caro.
+                      </div>
+                      
                       {!loadingSecondHalf && secondHalfProductId && halfAndHalfExtraPrice > 0 && (
-                        <div style={{ fontSize: '13px', fontWeight: 500, color: '#fb923c', backgroundColor: 'rgba(251,146,60,0.1)', padding: '12px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid rgba(251,146,60,0.2)' }}>
-                          <span style={{ fontSize: '16px' }}>💰</span> Será adicionado + R$ {halfAndHalfExtraPrice.toFixed(2)} pelo sabor mais caro.
+                        <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '8px' }}>
+                          <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {halfAndHalfExtraPrice.toFixed(2)}
                         </div>
                       )}
                     </div>

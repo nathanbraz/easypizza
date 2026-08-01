@@ -183,14 +183,39 @@
 }
 
 .product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100%, 1fr));
-  gap: 20px;
+  display: flex;
+  overflow-x: auto;
+  gap: 16px;
+  padding-bottom: 12px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  /* Esconder scrollbar por padrão para ficar limpo */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.product-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.product-grid > * {
+  flex: 0 0 calc(85% - 16px);
+  scroll-snap-align: start;
 }
 
 @media (min-width: 640px) {
   .product-grid {
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    flex-wrap: wrap;
+    overflow-x: visible;
+  }
+  .product-grid > * {
+    flex: 0 0 calc(50% - 16px);
+  }
+}
+
+@media (min-width: 1024px) {
+  .product-grid > * {
+    flex: 0 0 calc(33.333% - 16px);
   }
 }
 

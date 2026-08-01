@@ -16,6 +16,7 @@ export interface Product {
   isAvailable: boolean;
   addons?: ProductAddon[]; // Injetado pelo frontend
   categoryName?: string; // Campo opcional para facilitar a UI
+  allowsHalfAndHalf?: boolean; // Injetado pelo frontend (da categoria)
 }
 
 export interface ProductCategory {
@@ -24,4 +25,5 @@ export interface ProductCategory {
   displayOrder: number;
   products: Product[];
   addons?: ProductAddon[];
+  allowsHalfAndHalf?: boolean;
 }

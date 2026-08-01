@@ -306,45 +306,13 @@ export default function CatalogManager() {
             </table>
           </div>
         )}
-        
-        {activeTab === 'adicionais' && (
-          <div className="table-wrapper">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Nome do Adicional</th>
-                  <th>Preço Extra</th>
-                  <th>Categoria Vinculada</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {addons.map(a => {
-                  return (
-                    <tr key={a.id}>
-                      <td>{a.name}</td>
-                      <td>+ R$ {a.additionalPrice?.toFixed(2)}</td>
-                      <td>{a.categoryIds?.length > 0 ? `${a.categoryIds.length} vinculada(s)` : 'Nenhuma (Inativo)'}</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn-icon" onClick={() => openModal(a)}><Edit2 size={16} /></button>
-                          <button className="btn-icon" style={{ color: '#ef4444' }} onClick={() => handleDelete(a.id, 'adicional')}><Trash2 size={16} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
       </main>
 
       {isModalOpen && createPortal(
         <div className="modal-overlay">
           <div className={`modal-content glass-panel ${activeTab === 'produtos' ? 'modal-wide' : ''}`} style={{ width: activeTab === 'produtos' ? '780px' : '460px', height: 'fit-content', maxWidth: '95vw', padding: '28px', maxHeight: '90vh', overflowY: 'auto', overflowX: 'hidden' }}>
             <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <h2>{editingItem ? 'Editar' : (activeTab === 'categorias' ? 'Nova' : 'Novo')} {activeTab === 'categorias' ? 'Categoria' : activeTab === 'adicionais' ? 'Adicional' : 'Produto'}</h2>
+              <h2>{editingItem ? 'Editar' : (activeTab === 'categorias' ? 'Nova' : 'Novo')} {activeTab === 'categorias' ? 'Categoria' : 'Produto'}</h2>
               <button className="btn-icon" onClick={closeModal} type="button"><X size={24} /></button>
             </div>
             
