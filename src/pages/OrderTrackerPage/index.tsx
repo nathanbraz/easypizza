@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Clock, CheckCircle, ChefHat, Bike, FileCheck, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './OrderTrackerPage.css';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 export default function OrderTrackerPage() {
   const navigate = useNavigate();
@@ -187,7 +188,7 @@ export default function OrderTrackerPage() {
                   <Clock size={32} color="var(--primary)" />
                   <div className="eta-info" style={{ flex: 1 }}>
                     <span className="eta-label">Valor Total do Pedido</span>
-                    <span className="eta-time">R$ {Number(order.totalAmount).toFixed(2)}</span>
+                    <span className="eta-time">R$ {formatCurrency(order.totalAmount)}</span>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <span className="eta-label">Tipo</span>
@@ -231,7 +232,7 @@ export default function OrderTrackerPage() {
                               {it.quantity}x {it.product?.name || 'Item'}
                             </span>
                             <span style={{ color: '#fff', fontWeight: 700 }}>
-                              R$ {(it.quantity * it.unitPrice).toFixed(2)}
+                              R$ {formatCurrency(it.quantity * it.unitPrice)}
                             </span>
                           </div>
                           {/* Opções/Adicionais */}
@@ -242,7 +243,7 @@ export default function OrderTrackerPage() {
                               </span>
                               {Number(addon.price) > 0 && (
                                 <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
-                                  +R$ {Number(addon.price).toFixed(2)}
+                                  +R$ {formatCurrency(addon.price)}
                                 </span>
                               )}
                             </div>
@@ -261,18 +262,18 @@ export default function OrderTrackerPage() {
                       {Number(order.deliveryFee) > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--text-secondary)' }}>
                           <span>Taxa de Entrega</span>
-                          <span>R$ {Number(order.deliveryFee).toFixed(2)}</span>
+                          <span>R$ {formatCurrency(order.deliveryFee)}</span>
                         </div>
                       )}
                       {Number(order.discountAmount) > 0 && (
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#22c55e' }}>
                           <span>Desconto {order.couponCode ? `(${order.couponCode})` : ''}</span>
-                          <span>-R$ {Number(order.discountAmount).toFixed(2)}</span>
+                          <span>-R$ {formatCurrency(order.discountAmount)}</span>
                         </div>
                       )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '15px', fontWeight: 700, color: 'var(--primary)', marginTop: '6px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                         <span>Total</span>
-                        <span>R$ {Number(order.totalAmount).toFixed(2)}</span>
+                        <span>R$ {formatCurrency(order.totalAmount)}</span>
                       </div>
                     </div>
                   </div>
@@ -304,7 +305,7 @@ export default function OrderTrackerPage() {
                         {getStatusLabel(Number(ord.status))}
                       </span>
                     </h4>
-                    <p>{new Date(ord.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })} &bull; R$ {Number(ord.totalAmount).toFixed(2)}</p>
+                    <p>{new Date(ord.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })} &bull; R$ {formatCurrency(ord.totalAmount)}</p>
                   </div>
                   <button 
                     className="history-action-btn"

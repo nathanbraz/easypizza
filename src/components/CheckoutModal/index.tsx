@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './CheckoutModal.css';
 import ProductModal from '../ProductModal';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface CheckoutModalProps {
   cart: any[];
@@ -188,7 +189,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       }
       
       setDiscountAmount(discount);
-      setCouponSuccess(`Cupom aplicado! Desconto de R$ ${discount.toFixed(2)}`);
+      setCouponSuccess(`Cupom aplicado! Desconto de R$ ${formatCurrency(discount)}`);
       if (codeToApply) setCouponCode(codeToApply);
     } catch (err: any) {
       setDiscountAmount(0);
@@ -385,7 +386,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                        <div className="rich-cart-details">
                          <h4 style={{ lineHeight: '1.2', paddingBottom: '4px' }}>{title}</h4>
                          {item.size && <span className="cart-badge">{item.size.name}</span>}
-                         <div className="cart-price">R$ {item.finalPrice.toFixed(2)}</div>
+                         <div className="cart-price">R$ {formatCurrency(item.finalPrice)}</div>
                        </div>
                      </div>
                      
@@ -394,7 +395,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
                        
                        {item.selectedOptions && item.selectedOptions.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any, idx: number) => (
-                          <div key={idx} className="custom-item addon">• {opt.groupName}: {opt.name} {opt.additionalPrice > 0 ? `(+R$ ${opt.additionalPrice.toFixed(2)})` : ''}</div>
+                          <div key={idx} className="custom-item addon">• {opt.groupName}: {opt.name} {opt.additionalPrice > 0 ? `(+R$ ${formatCurrency(opt.additionalPrice)})` : ''}</div>
                        ))}
                        
                        {item.selectedDrinks && item.selectedDrinks.map((d: any, idx: number) => (
@@ -437,7 +438,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                      <h3 className="cross-sell-title">Aproveite e leve também:</h3>
                      <div className="horizontal-scroll">
                         {availableDrinks.map(drink => {
-                          let displayPrice = `+ R$ ${drink.price.toFixed(2)}`;
+                          let displayPrice = `+ R$ ${formatCurrency(drink.price)}`;
                           
                           if (drink.price === 0) {
                             let minAdditionalPrice = 0;
@@ -454,7 +455,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                             }
                             
                             if (hasMandatoryOptions && minAdditionalPrice > 0) {
-                              displayPrice = `A partir de R$ ${minAdditionalPrice.toFixed(2)}`;
+                              displayPrice = `A partir de R$ ${formatCurrency(minAdditionalPrice)}`;
                             } else if (drink.optionGroups && drink.optionGroups.length > 0) {
                               displayPrice = 'Ver opções';
                             } else {
@@ -512,15 +513,15 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                  </div>
                  
                  <div className="form-row">
-                   <div className="form-group" style={{flex: 3}}>
+                   <div className="form-group" style={{flex: 2}}>
                      <label>Rua</label>
                      <input type="text" value={address.street} onChange={e => setAddress({...address, street: e.target.value})} />
                    </div>
-                    <div className="form-group" style={{flex: 1}}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <div className="form-group" style={{flex: 1.2}}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <label style={{ margin: 0 }}>Número</label>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.8rem', color: isNoNumber ? 'var(--primary)' : 'var(--text-muted)', fontWeight: isNoNumber ? 'bold' : 'normal', transition: '0.2s' }}>Sem Nº</span>
+                          <span style={{ fontSize: '0.8rem', color: isNoNumber ? 'var(--primary)' : 'var(--text-muted)', fontWeight: isNoNumber ? 'bold' : 'normal', transition: '0.2s', whiteSpace: 'nowrap' }}>Sem Nº</span>
                           <label className="custom-toggle">
                             <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
                             <span className="custom-toggle-slider"></span>
@@ -602,7 +603,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
                          </div>
                        </div>
-                       <span style={{ fontWeight: 'bold' }}>R$ {item.finalPrice.toFixed(2)}</span>
+                       <span style={{ fontWeight: 'bold' }}>R$ {formatCurrency(item.finalPrice)}</span>
                      </div>
                    ))}
                  </div>
@@ -694,12 +695,12 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                </section>
 
                <section className="checkout-section totals-section">
-                 <div className="total-row"><span>Subtotal ({cart.length} itens)</span><span>R$ {subTotal.toFixed(2)}</span></div>
-                 <div className="total-row"><span>Entrega</span><span>R$ {deliveryFee.toFixed(2)}</span></div>
+                 <div className="total-row"><span>Subtotal ({cart.length} itens)</span><span>R$ {formatCurrency(subTotal)}</span></div>
+                 <div className="total-row"><span>Entrega</span><span>R$ {formatCurrency(deliveryFee)}</span></div>
                  {discountAmount > 0 && (
-                   <div className="total-row discount-row"><span>Desconto</span><span>- R$ {discountAmount.toFixed(2)}</span></div>
+                   <div className="total-row discount-row"><span>Desconto</span><span>- R$ {formatCurrency(discountAmount)}</span></div>
                  )}
-                 <div className="total-row grand-total"><span>Total</span><span>R$ {total.toFixed(2)}</span></div>
+                 <div className="total-row grand-total"><span>Total</span><span>R$ {formatCurrency(total)}</span></div>
                </section>
              </div>
           )}
@@ -731,7 +732,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                   style={{flex: 1, opacity: (!canFinishOrder) ? 0.5 : 1, cursor: (!canFinishOrder) ? 'not-allowed' : 'pointer'}} 
                   onClick={handleFinishOrder}
                   disabled={!canFinishOrder}
-                  title={isStoreClosed ? "A loja está fechada" : doesNotMeetMinimum ? `Pedido mínimo é R$ ${storeSettings?.minimumOrderAmount.toFixed(2)}` : paymentTypeId === '' ? "Selecione uma forma de pagamento" : ""}
+                  title={isStoreClosed ? "A loja está fechada" : doesNotMeetMinimum ? `Pedido mínimo é R$ ${formatCurrency(storeSettings?.minimumOrderAmount)}` : paymentTypeId === '' ? "Selecione uma forma de pagamento" : ""}
                 >
                   <CheckCircle size={20} /> Finalizar Pedido
                 </button>

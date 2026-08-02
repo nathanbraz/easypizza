@@ -8,6 +8,7 @@ import 'react-easy-crop/react-easy-crop.css';
 import getCroppedImg from '../../../utils/cropImage';
 import ProductOptionsModal from './ProductOptionsModal';
 import './Catalog.css';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 export default function CatalogManager() {
   const [activeTab, setActiveTab] = useState('produtos');
@@ -263,7 +264,7 @@ export default function CatalogManager() {
                         </div>
                       </td>
                       <td>{cat?.name || 'Sem categoria'}</td>
-                      <td>R$ {p.price?.toFixed(2)}</td>
+                      <td>R$ {formatCurrency(p.price)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button className="btn-icon" title="Gerenciar Opções/Tamanhos" onClick={() => openOptionsModal(p)}><Plus size={16} /></button>
@@ -418,7 +419,7 @@ export default function CatalogManager() {
 
                     <div className="form-group" style={{ marginTop: '16px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <label style={{ margin: 0 }}>Sugerir no Carrinho (Cross-Sell)?</label>
+                        <label style={{ margin: 0 }}>Sugerir no Carrinho?</label>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ative para mostrar este produto na vitrine "Aproveite e leve também" ao finalizar o pedido.</span>
                       </div>
                       <label className="toggle-switch">

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Edit2 } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 interface ProductOptionsModalProps {
   product: any;
@@ -209,15 +210,13 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
   return createPortal(
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
       <div className="modal-content glass-panel modal-wide" style={{ width: '800px', maxWidth: '95vw', height: '80vh', display: 'flex', flexDirection: 'column' }}>
-        <div className="modal-header" style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>Opções: {product.name}</h2>
-              <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
-                Crie tamanhos, pontos de carne, adicionais específicos para este produto.
-              </p>
-            </div>
-            <button className="btn-icon" onClick={onClose}><X size={24} /></button>
+        <div className="modal-header" style={{ padding: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', position: 'relative' }}>
+          <button className="modal-close" style={{ position: 'absolute', top: '24px', right: '24px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={onClose}><X size={24} /></button>
+          <div style={{ paddingRight: '40px' }}>
+            <h2 style={{ margin: 0 }}>Opções: {product.name}</h2>
+            <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
+              Crie tamanhos, pontos de carne, adicionais específicos para este produto.
+            </p>
           </div>
         </div>
 
@@ -282,7 +281,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                           {g.options.map((opt: any) => (
                             <tr key={opt.id}>
                               <td>{opt.name}</td>
-                              <td>+ R$ {opt.additionalPrice?.toFixed(2)}</td>
+                              <td>+ R$ {formatCurrency(opt.additionalPrice)}</td>
                               <td>
                                 <div style={{ display: 'flex', gap: '8px' }}>
                                   <button className="btn-icon" onClick={() => openItemForm(g.id, opt)}><Edit2 size={14} /></button>
@@ -322,7 +321,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
                   {/* TIPO 1: Seleção Única */}
                   <label style={{ display: 'flex', gap: '12px', cursor: 'pointer', background: groupType === 'single' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${groupType === 'single' ? '#f97316' : 'rgba(255,255,255,0.1)'}`, padding: '12px', borderRadius: '8px' }}>
-                    <input type="radio" name="groupType" value="single" checked={groupType === 'single'} onChange={() => setGroupType('single')} style={{ marginTop: '2px', accentColor: '#f97316' }} />
+                    <input type="radio" name="groupType" value="single" checked={groupType === 'single'} onChange={() => setGroupType('single')} style={{ marginTop: '2px', accentColor: '#f97316', outline: 'none', boxShadow: 'none' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontWeight: 600, color: groupType === 'single' ? '#f97316' : '#fff' }}>🔘 Seleção Única (Obrigatória)</span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>O cliente escolhe apenas UMA opção. Ideal para Tamanhos, Bordas, Ponto da Carne.</span>
@@ -331,7 +330,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
                   {/* TIPO 2: Múltipla Escolha */}
                   <label style={{ display: 'flex', gap: '12px', cursor: 'pointer', background: groupType === 'multiple' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${groupType === 'multiple' ? '#f97316' : 'rgba(255,255,255,0.1)'}`, padding: '12px', borderRadius: '8px' }}>
-                    <input type="radio" name="groupType" value="multiple" checked={groupType === 'multiple'} onChange={() => setGroupType('multiple')} style={{ marginTop: '2px', accentColor: '#f97316' }} />
+                    <input type="radio" name="groupType" value="multiple" checked={groupType === 'multiple'} onChange={() => setGroupType('multiple')} style={{ marginTop: '2px', accentColor: '#f97316', outline: 'none', boxShadow: 'none' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontWeight: 600, color: groupType === 'multiple' ? '#f97316' : '#fff' }}>☑️ Múltipla Escolha Simples</span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>O cliente pode marcar vários. Ideal para "Retirar Ingredientes" ou "Incluir Extras".</span>
@@ -340,7 +339,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
                   {/* TIPO 3: Adicionais por Quantidade (Contador) */}
                   <label style={{ display: 'flex', gap: '12px', cursor: 'pointer', background: groupType === 'counter' ? 'rgba(249, 115, 22, 0.1)' : 'rgba(255,255,255,0.03)', border: `1px solid ${groupType === 'counter' ? '#f97316' : 'rgba(255,255,255,0.1)'}`, padding: '12px', borderRadius: '8px' }}>
-                    <input type="radio" name="groupType" value="counter" checked={groupType === 'counter'} onChange={() => setGroupType('counter')} style={{ marginTop: '2px', accentColor: '#f97316' }} />
+                    <input type="radio" name="groupType" value="counter" checked={groupType === 'counter'} onChange={() => setGroupType('counter')} style={{ marginTop: '2px', accentColor: '#f97316', outline: 'none', boxShadow: 'none' }} />
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontWeight: 600, color: groupType === 'counter' ? '#f97316' : '#fff' }}>🔢 Adicionais por Quantidade (Contador)</span>
                       <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>O cliente usa botões + e - para pedir quantidades. Ideal para Bacon 3x, Queijo 2x, etc.</span>

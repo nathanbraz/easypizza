@@ -138,7 +138,12 @@ export default function OrdersDashboard() {
     return phone;
   };
 
-  const formatCurrency = (val: string | number) => Number(val).toFixed(2).replace('.', ',');
+  const formatCurrency = (val: string | number | undefined | null) => {
+    if (val === null || val === undefined) return '0,00';
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   const printOrderTicket = (order: Order) => {
     const isPickup = Number(order.type) === 2 || order.type === 'Pickup';
@@ -399,7 +404,7 @@ export default function OrdersDashboard() {
                       <div className="order-customer">{order.customer?.name || 'Cliente'}</div>
                       <div className="order-items" style={{ whiteSpace: 'pre-line' }}>{getItemsSummary(order)}</div>
                       <div className="order-footer">
-                        <span className="order-total">R$ {(order.totalAmount ?? order.subTotal ?? 0).toFixed(2)}</span>
+                        <span className="order-total">R$ {formatCurrency(order.totalAmount ?? order.subTotal ?? 0)}</span>
                         <div className="order-actions">
                           <button 
                             className="btn-icon" 
@@ -502,7 +507,7 @@ export default function OrdersDashboard() {
                           <tr key={idx}>
                             <td><strong>{item.quantity}x</strong></td>
                             <td><strong>{item.product?.name || 'Item'}</strong></td>
-                            <td style={{ textAlign: 'right' }}>R$ {(item.quantity * Number(item.unitPrice || 0)).toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>R$ {formatCurrency(item.quantity * Number(item.unitPrice || 0))}</td>
                           </tr>
                           {/* Opções/Adicionais do item */}
                           {item.addons && item.addons.map((addon, aIdx) => (
@@ -510,7 +515,7 @@ export default function OrdersDashboard() {
                               <td></td>
                               <td style={{ fontSize: '12px', color: 'var(--text-muted)', paddingLeft: '12px' }}>
                                 ↳ {addon.quantity && addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.addonName}
-                                {Number(addon.price) > 0 && <span style={{ color: 'var(--primary)', marginLeft: '6px' }}>+R$ {Number(addon.price).toFixed(2)}</span>}
+                                {Number(addon.price) > 0 && <span style={{ color: 'var(--primary)', marginLeft: '6px' }}>+R$ {formatCurrency(addon.price)}</span>}
                               </td>
                               <td></td>
                             </tr>
@@ -539,21 +544,21 @@ export default function OrdersDashboard() {
               <div className="order-detail-section" style={{ backgroundColor: 'rgba(249, 115, 22, 0.05)', borderColor: 'rgba(249, 115, 22, 0.15)' }}>
                 <div className="order-detail-row">
                   <span>Subtotal:</span>
-                  <span>R$ {Number(selectedOrder.subTotal || 0).toFixed(2)}</span>
+                  <span>R$ {formatCurrency(selectedOrder.subTotal || 0)}</span>
                 </div>
                 <div className="order-detail-row">
                   <span>Taxa de Entrega:</span>
-                  <span>R$ {Number(selectedOrder.deliveryFee || 0).toFixed(2)}</span>
+                  <span>R$ {formatCurrency(selectedOrder.deliveryFee || 0)}</span>
                 </div>
                 {Number(selectedOrder.discountAmount) > 0 && (
                   <div className="order-detail-row" style={{ color: '#22c55e' }}>
                     <span>Desconto {selectedOrder.couponCode ? `(${selectedOrder.couponCode})` : ''}:</span>
-                    <span>- R$ {Number(selectedOrder.discountAmount).toFixed(2)}</span>
+                    <span>- R$ {formatCurrency(selectedOrder.discountAmount)}</span>
                   </div>
                 )}
                 <div className="order-detail-row" style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '15px' }}>
                   <strong style={{ color: 'var(--primary, #f97316)' }}>Total do Pedido:</strong>
-                  <strong style={{ color: 'var(--primary, #f97316)', fontSize: '16px' }}>R$ {Number(selectedOrder.totalAmount ?? selectedOrder.subTotal ?? 0).toFixed(2)}</strong>
+                  <strong style={{ color: 'var(--primary, #f97316)', fontSize: '16px' }}>R$ {formatCurrency(selectedOrder.totalAmount ?? selectedOrder.subTotal ?? 0)}</strong>
                 </div>
               </div>
             </div>

@@ -1,6 +1,7 @@
 import { Plus } from 'lucide-react';
 import type { Product } from '../../types';
 import './ProductCard.css';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface ProductCardProps {
   product: Product;
@@ -22,7 +23,7 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
 
   const getDisplayPrice = () => {
     if (product.price > 0) {
-      return `R$ ${product.price.toFixed(2)}`;
+      return `R$ ${formatCurrency(product.price)}`;
     }
 
     let minAdditionalPrice = 0;
@@ -40,7 +41,7 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
     }
 
     if (hasMandatoryOptions && minAdditionalPrice > 0) {
-      return `A partir de R$ ${minAdditionalPrice.toFixed(2)}`;
+      return `A partir de R$ ${formatCurrency(minAdditionalPrice)}`;
     }
 
     if (product.optionGroups && product.optionGroups.length > 0) {

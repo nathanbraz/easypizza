@@ -3,6 +3,7 @@ import { X, Plus, Minus, Search, CheckCircle2 } from 'lucide-react';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './ProductModal.css';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 import type { Product } from '../../types';
 
@@ -322,7 +323,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                             <div key={opt.id} className="counter-item">
                               <div className="counter-item-info">
                                 <span className="name">{opt.name}</span>
-                                <span className="price">{opt.additionalPrice > 0 ? `R$ ${opt.additionalPrice.toFixed(2)}` : 'Grátis'}</span>
+                                <span className="price">{opt.additionalPrice > 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : 'Grátis'}</span>
                               </div>
                               <div className="counter-controls">
                                 <button 
@@ -356,7 +357,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                               />
                               <div className="radio-info">
                                 <span className="name">{opt.name}</span>
-                                <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${opt.additionalPrice.toFixed(2)}` : (opt.additionalPrice < 0 ? `- R$ ${Math.abs(opt.additionalPrice).toFixed(2)}` : (product.price === 0 ? `R$ ${opt.additionalPrice.toFixed(2)}` : ''))}</span>
+                                <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : (opt.additionalPrice < 0 ? `- R$ ${formatCurrency(Math.abs(opt.additionalPrice))}` : (product.price === 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : ''))}</span>
                               </div>
                             </label>
                           );
@@ -371,7 +372,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                                 onChange={() => handleToggleOption(group.id, opt.id, group.maxChoices)} 
                               />
                               <span className="name">{opt.name}</span>
-                              <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${opt.additionalPrice.toFixed(2)}` : ''}</span>
+                              <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : ''}</span>
                             </label>
                           );
                         }
@@ -484,7 +485,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                                       </span>
                                     )}
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                                      <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {estimatedFlavorPrice.toFixed(2)}</span>
+                                      <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {formatCurrency(estimatedFlavorPrice)}</span>
                                       {sizeOption && (
                                         <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                           Tam: {sizeOption.name}
@@ -525,7 +526,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
                       
                       {!loadingSecondHalf && secondHalfProductId && halfAndHalfExtraPrice > 0 && (
                         <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '8px' }}>
-                          <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {halfAndHalfExtraPrice.toFixed(2)}
+                          <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {formatCurrency(halfAndHalfExtraPrice)}
                         </div>
                       )}
                     </div>
@@ -561,7 +562,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
             onClick={handleConfirm}
             style={{ opacity: isValid ? 1 : 0.5 }}
           >
-            Adicionar • R$ {finalTotal.toFixed(2)}
+            Adicionar • R$ {formatCurrency(finalTotal)}
           </button>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { api } from '../../../lib/api';
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import '../Catalog/Catalog.css';
 import './Settings.css';
+import { formatCurrency } from '../../../utils/formatCurrency';
 
 export default function SettingsManager() {
   const [activeTab, setActiveTab] = useState('geral');
@@ -511,7 +512,7 @@ export default function SettingsManager() {
                     </td>
                     <td>
                       <span style={{ color: 'var(--primary)', fontWeight: 'bold' }}>
-                        {c.discountPercentage ? `${c.discountPercentage}%` : `R$ ${c.discountFixedAmount?.toFixed(2)}`}
+                        {c.discountPercentage ? `${c.discountPercentage}%` : `R$ ${formatCurrency(c.discountFixedAmount)}`}
                       </span>
                     </td>
                     <td>{c.usageLimit > 0 ? c.usageLimit : 'Ilimitado'}</td>

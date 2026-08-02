@@ -1,5 +1,6 @@
 import { ShoppingBag, ChevronRight } from 'lucide-react';
 import './Cart.css';
+import { formatCurrency } from '../../utils/formatCurrency';
 
 interface CartProps {
   items: any[];
@@ -18,7 +19,7 @@ export default function Cart({ items, onCheckout }: CartProps) {
         </div>
         <div className="cart-total">
           <span className="cart-label">Total do Pedido</span>
-          <strong>R$ {total.toFixed(2)}</strong>
+          <strong>R$ {formatCurrency(total)}</strong>
         </div>
       </div>
       <button className="checkout-btn" onClick={onCheckout}>
