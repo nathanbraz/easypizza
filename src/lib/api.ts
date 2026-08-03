@@ -52,6 +52,13 @@ api.interceptors.request.use((config) => {
       config.headers['X-Tenant-Slug'] = slug;
     }
   }
+  
+  // Anexar JWT Token de Autenticação, se existir
+  const token = localStorage.getItem('@EasyPizza:Token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
+  
   return config;
 });
 
@@ -72,6 +79,15 @@ api.interceptors.response.use(
       console.error("[SaaS] Tenant suspenso por inadimplência. Disparando evento global...");
       window.dispatchEvent(new Event('tenant-suspended'));
     }
+    
+    // Tratamento global para 401 Unauthorized
+    if (error.response?.status === 401) {
+      console.error("[Auth] Sessão expirada ou não autenticado.");
+      // Limpa token e emite evento
+      localStorage.removeItem('@EasyPizza:Token');
+      window.dispatchEvent(new Event('unauthorized-access'));
+    }
+    
     return Promise.reject(error);
   }
 );

@@ -1,8 +1,16 @@
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Building2, ShieldAlert, Settings, LogOut } from 'lucide-react';
+import { useAuth } from '../../../contexts/AuthContext';
 import './SuperAdminLayout.css';
 
 export default function SuperAdminLayout() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
   return (
     <div className="superadmin-container">
       <aside className="superadmin-sidebar glass-panel">
@@ -32,7 +40,7 @@ export default function SuperAdminLayout() {
         </nav>
 
         <div className="superadmin-sidebar-footer">
-          <button className="logout-btn">
+          <button className="logout-btn" onClick={handleLogout}>
             <LogOut size={20} />
             <span>Sair do SaaS</span>
           </button>

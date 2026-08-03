@@ -13,6 +13,9 @@ import SuperAdminLayout from './pages/SuperAdmin/Layout/SuperAdminLayout';
 import TenantsDashboard from './pages/SuperAdmin/Tenants';
 import SuperAdminDashboard from './pages/SuperAdmin/Dashboard';
 import { isSuperAdmin, api, getTenantSlugFromUrl } from './lib/api';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
+import Login from './pages/Auth/Login';
 
 import './index.css';
 
@@ -63,16 +66,21 @@ function App() {
 
   if (superAdmin) {
     return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<SuperAdminLayout />}>
-            <Route index element={<SuperAdminDashboard />} />
-            <Route path="tenants" element={<TenantsDashboard />} />
-            <Route path="settings" element={<div style={{ padding: '2rem', color: '#fff' }}><h2>Configurações Globais do SaaS (Em breve)</h2></div>} />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route element={<ProtectedRoute requiredScope="Master" />}>
+              <Route path="/" element={<SuperAdminLayout />}>
+                <Route index element={<SuperAdminDashboard />} />
+                <Route path="tenants" element={<TenantsDashboard />} />
+                <Route path="settings" element={<div style={{ padding: '2rem', color: '#fff' }}><h2>Configurações Globais do SaaS (Em breve)</h2></div>} />
+              </Route>
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     );
   }
 
@@ -109,34 +117,42 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Rota Raiz por Subdomínio (ex: pizzatop.lvh.me / pizzariabrazil.lvh.me) */}
-        <Route path="/" element={<MenuPage />} />
-        <Route path="/pedido" element={<MenuPage />} />
-        
-        {/* Rota de Fallback para localhost sem subdomínios (ex: localhost:3333/pizzariabrazil) */}
-        {!isSubdomain && (
-          <>
-            <Route path="/:tenantSlug" element={<MenuPage />} />
-            <Route path="/:tenantSlug/pedido" element={<MenuPage />} />
-          </>
-        )}
-        
-        <Route path="/tracker" element={<OrderTrackerPage />} />
-        <Route path="/tracker/:orderId" element={<OrderTrackerPage />} />
-        
-        <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<Navigate to="orders" replace />} />
-          <Route path="orders" element={<OrdersDashboard />} />
-          <Route path="catalog" element={<CatalogManager />} />
-          <Route path="couriers" element={<CouriersManager />} />
-          <Route path="settings" element={<SettingsManager />} />
-        </Route>
-        
-        <Route path="*" element={<RedirectWithQuery />} />
-      </Routes>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Rotas Públicas */}
+          <Route path="/login" element={<Login />} />
+          
+          {/* Rota Raiz por Subdomínio (ex: pizzatop.lvh.me / pizzariabrazil.lvh.me) */}
+          <Route path="/" element={<MenuPage />} />
+          <Route path="/pedido" element={<MenuPage />} />
+          
+          {/* Rota de Fallback para localhost sem subdomínios (ex: localhost:3333/pizzariabrazil) */}
+          {!isSubdomain && (
+            <>
+              <Route path="/:tenantSlug" element={<MenuPage />} />
+              <Route path="/:tenantSlug/pedido" element={<MenuPage />} />
+            </>
+          )}
+          
+          <Route path="/tracker" element={<OrderTrackerPage />} />
+          <Route path="/tracker/:orderId" element={<OrderTrackerPage />} />
+          
+          {/* Rotas Privadas das Pizzarias */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="orders" replace />} />
+              <Route path="orders" element={<OrdersDashboard />} />
+              <Route path="catalog" element={<CatalogManager />} />
+              <Route path="couriers" element={<CouriersManager />} />
+              <Route path="settings" element={<SettingsManager />} />
+            </Route>
+          </Route>
+          
+          <Route path="*" element={<RedirectWithQuery />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

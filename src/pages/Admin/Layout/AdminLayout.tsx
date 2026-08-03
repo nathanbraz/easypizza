@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, Pizza, Bike, Settings, LogOut, Megaphone } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
   const [globalMsg, setGlobalMsg] = useState<string | null>(null);
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   useEffect(() => {
     // Busca avisos globais do SaaS
@@ -43,7 +51,7 @@ export default function AdminLayout() {
           </NavLink>
         </nav>
         <div className="sidebar-footer">
-          <button className="logout-btn">
+          <button className="logout-btn" onClick={handleLogout}>
             <LogOut size={20} />
             <span>Sair</span>
           </button>
