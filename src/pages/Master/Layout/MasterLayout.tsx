@@ -1,9 +1,9 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Building2, ShieldAlert, Settings, LogOut } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
-import './SuperAdminLayout.css';
+import './MasterLayout.css';
 
-export default function SuperAdminLayout() {
+export default function MasterLayout() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -12,34 +12,38 @@ export default function SuperAdminLayout() {
     navigate('/login');
   };
   return (
-    <div className="superadmin-container">
-      <aside className="superadmin-sidebar glass-panel">
-        <div className="superadmin-sidebar-header">
-          <div className="superadmin-logo">
-            <ShieldAlert size={28} className="superadmin-icon-pulse" />
+    <div className="master-container">
+      <aside className="master-sidebar glass-panel">
+        <div className="master-sidebar-header">
+          <div className="master-logo">
+            <ShieldAlert size={28} className="master-icon-pulse" />
             <div>
               <h2>EasyPizza</h2>
-              <span className="superadmin-badge">SUPER ADMIN</span>
+              <span className="master-badge">MASTER</span>
             </div>
           </div>
         </div>
         
-        <nav className="superadmin-nav">
+        <nav className="master-nav">
           <NavLink to="/" end className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <ShieldAlert size={20} />
             <span>Dashboard</span>
           </NavLink>
-          <NavLink to="/tenants" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/master/tenants" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Building2 size={20} />
-            <span>Empresas (Tenants)</span>
+            <span>Lojistas (Tenants)</span>
           </NavLink>
-          <NavLink to="/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+          <NavLink to="/master/users" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+            <ShieldAlert size={20} />
+            <span>Equipe Master</span>
+          </NavLink>
+          <NavLink to="/master/roles" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Settings size={20} />
-            <span>Configurações Globais</span>
+            <span>Cargos e Permissões</span>
           </NavLink>
         </nav>
 
-        <div className="superadmin-sidebar-footer">
+        <div className="master-sidebar-footer">
           <button className="logout-btn" onClick={handleLogout}>
             <LogOut size={20} />
             <span>Sair do SaaS</span>
@@ -47,8 +51,8 @@ export default function SuperAdminLayout() {
         </div>
       </aside>
 
-      <main className="superadmin-content">
-        <header className="superadmin-topbar">
+      <main className="master-content">
+        <header className="master-topbar">
           <div className="topbar-info">
           </div>
           <div className="topbar-actions">
@@ -59,7 +63,7 @@ export default function SuperAdminLayout() {
           </div>
         </header>
 
-        <div className="superadmin-page-body">
+        <div className="master-page-body">
           <Outlet />
         </div>
       </main>

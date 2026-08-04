@@ -30,7 +30,7 @@ export default function TenantsDashboard() {
   const fetchTenants = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/superadmin/tenants');
+      const res = await api.get('/master/tenants');
       const data = res.data.data || res.data || [];
       if (Array.isArray(data)) {
         setTenants(data);
@@ -67,7 +67,7 @@ export default function TenantsDashboard() {
     setFeedbackMsg(null);
 
     try {
-      await api.post('/superadmin/tenants', {
+      await api.post('/master/tenants', {
         name,
         slug,
         connectionString: connectionString || undefined
@@ -92,7 +92,7 @@ export default function TenantsDashboard() {
     setMigratingSlug(tenantSlug);
     setFeedbackMsg(null);
     try {
-      const res = await api.post(`/superadmin/tenants/${tenantSlug}/migrate`);
+      const res = await api.post(`/master/tenants/${tenantSlug}/migrate`);
       setFeedbackMsg({ text: res.data.message || `Banco da ${tenantName} atualizado!`, type: 'success' });
     } catch (error: any) {
       const errMsg = error.response?.data?.message || "Erro na migração do banco.";
@@ -107,7 +107,7 @@ export default function TenantsDashboard() {
     
     setFeedbackMsg(null);
     try {
-      const res = await api.post('/superadmin/tenants/sync-all');
+      const res = await api.post('/master/tenants/sync-all');
       setFeedbackMsg({ text: res.data.message || "Sincronização em massa concluída!", type: 'success' });
     } catch (error: any) {
       setFeedbackMsg({ text: "Erro ao tentar sincronizar os bancos de dados.", type: 'error' });
@@ -119,7 +119,7 @@ export default function TenantsDashboard() {
     if (!window.confirm(`Tem certeza que deseja ${action} esta empresa? ${currentStatus ? "O cardápio e o painel admin dela sairão do ar imediatamente." : "O acesso será restaurado."}`)) return;
 
     try {
-      await api.put(`/superadmin/tenants/${tenantSlug}/toggle-status`);
+      await api.put(`/master/tenants/${tenantSlug}/toggle-status`);
       setFeedbackMsg({ text: `Empresa ${action === "SUSPENDER" ? "suspensa" : "ativada"} com sucesso.`, type: 'success' });
       fetchTenants(); // Recarrega para ver o novo status
     } catch (error: any) {

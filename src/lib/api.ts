@@ -8,14 +8,14 @@ export const api = axios.create({
 });
 
 /**
- * Verifica se o host atual ou URL é do painel SuperAdmin.
- * Suporta admin.easypizza.com.br, admin.lvh.me ou fallback para localhost/superadmin.
+ * Verifica se o host atual ou URL é do painel Master.
+ * Suporta admin.easypizza.com.br, admin.lvh.me ou fallback para localhost/master.
  */
-export const isSuperAdmin = (): boolean => {
+export const isMaster = (): boolean => {
   const hostname = window.location.hostname;
   return hostname.startsWith('admin.') || 
          hostname === 'admin.localhost' || 
-         window.location.pathname.startsWith('/superadmin');
+         window.location.pathname.startsWith('/master');
 };
 
 /**
@@ -29,14 +29,14 @@ export const getTenantSlugFromUrl = (): string => {
   if (hostname.includes('.')) {
     const parts = hostname.split('.');
     // Evita retornar www, api, localhost ou admin como um slug de pizzaria
-    if (parts[0] !== 'www' && parts[0] !== 'localhost' && parts[0] != 'api' && parts[0] !== 'admin' && parts[0] !== 'superadmin') {
+    if (parts[0] !== 'www' && parts[0] !== 'localhost' && parts[0] != 'api' && parts[0] !== 'admin' && parts[0] !== 'master') {
       return parts[0];
     }
   }
   
   // Fallback de caminho para desenvolvimento no localhost sem subdomínio (ex. localhost:3333/pizzariabrazil)
   const pathParts = window.location.pathname.split('/').filter(Boolean);
-  if (pathParts.length > 0 && pathParts[0] !== 'admin' && pathParts[0] !== 'superadmin' && pathParts[0] !== 'tracker') {
+  if (pathParts.length > 0 && pathParts[0] !== 'admin' && pathParts[0] !== 'master' && pathParts[0] !== 'tracker') {
       return pathParts[0]; 
   }
   
@@ -46,7 +46,7 @@ export const getTenantSlugFromUrl = (): string => {
 
 // Request interceptor para anexar automaticamente o cabeçalho X-Tenant-Slug a cada requisição
 api.interceptors.request.use((config) => {
-  if (!isSuperAdmin()) {
+  if (!isMaster()) {
     const slug = getTenantSlugFromUrl();
     if (slug) {
       config.headers['X-Tenant-Slug'] = slug;

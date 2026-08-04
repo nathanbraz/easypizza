@@ -1,26 +1,27 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, getTenantSlugFromUrl, isSuperAdmin } from '../../lib/api';
+import { api, getTenantSlugFromUrl, isMaster } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Lock, Mail, Loader2 } from 'lucide-react';
+import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
 import './Login.css';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const { login, isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
-  const superAdminMode = isSuperAdmin();
+  const masterMode = isMaster();
   const tenantSlug = getTenantSlugFromUrl();
 
   // Se já estiver logado, redireciona automaticamente para o painel correspondente
   useEffect(() => {
     if (isAuthenticated && user) {
       if (user.scope === 'Master') {
-        if (superAdminMode) {
+        if (masterMode) {
           navigate('/');
         } else {
           navigate('/admin/orders');
@@ -29,7 +30,7 @@ export default function Login() {
         navigate('/admin/orders');
       }
     }
-  }, [isAuthenticated, user, navigate, superAdminMode]);
+  }, [isAuthenticated, user, navigate, masterMode]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,8 +60,8 @@ export default function Login() {
 
         // Redireciona com base no escopo e modo
         if (payload.scope === 'Master') {
-          // Se logou como Master na raiz do SuperAdmin
-          if (superAdminMode) {
+          // Se logou como Master na raiz do Master
+          if (masterMode) {
             // Em App.tsx a rota master está na raiz '/'
             navigate('/');
           } else {
@@ -90,16 +91,16 @@ export default function Login() {
     <div className="login-container">
       <div className="login-card">
         <div className="login-header">
-          {superAdminMode ? (
+          {masterMode ? (
             <span className="tenant-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#fbcfe8', borderColor: 'rgba(236, 72, 153, 0.3)' }}>
               Acesso Global
             </span>
           ) : (
             <span className="tenant-badge">Área Restrita</span>
           )}
-          <h1>{superAdminMode ? 'SuperAdmin Login' : 'Acesso ao Sistema'}</h1>
+          <h1>{masterMode ? 'Master Login' : 'Acesso ao Sistema'}</h1>
           <p>
-            {superAdminMode 
+            {masterMode 
               ? 'Área exclusiva para administração do SaaS' 
               : `Gerencie a sua loja conectada ao ${tenantSlug}`}
           </p>
@@ -135,14 +136,32 @@ export default function Login() {
               <Lock className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
               <input
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 className="form-input"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                style={{ paddingLeft: '2.5rem' }}
+                style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '14px',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#a0aabf',
+                  padding: 0,
+                  display: 'flex',
+                  alignItems: 'center'
+                }}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
             </div>
           </div>
 

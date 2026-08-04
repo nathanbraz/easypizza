@@ -1,4 +1,4 @@
-.superadmin-container {
+.master-container {
   display: flex;
   height: 100vh;
   width: 100vw;
@@ -8,7 +8,7 @@
   overflow: hidden;
 }
 
-.superadmin-sidebar {
+.master-sidebar {
   width: 280px;
   background: linear-gradient(180deg, #131722 0%, #0d0f14 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
@@ -19,17 +19,17 @@
   z-index: 10;
 }
 
-.superadmin-sidebar-header {
+.master-sidebar-header {
   margin-bottom: 2.5rem;
 }
 
-.superadmin-logo {
+.master-logo {
   display: flex;
   align-items: center;
   gap: 0.8rem;
 }
 
-.superadmin-logo h2 {
+.master-logo h2 {
   font-size: 1.25rem;
   font-weight: 700;
   color: #ffffff;
@@ -37,7 +37,7 @@
   letter-spacing: -0.02em;
 }
 
-.superadmin-badge {
+.master-badge {
   display: inline-block;
   background: linear-gradient(90deg, #f59e0b, #ef4444);
   color: #fff;
@@ -50,7 +50,7 @@
   box-shadow: 0 2px 10px rgba(245, 158, 11, 0.3);
 }
 
-.superadmin-icon-pulse {
+.master-icon-pulse {
   color: #f59e0b;
   animation: pulse-glow 2s infinite;
 }
@@ -60,14 +60,14 @@
   50% { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8)); }
 }
 
-.superadmin-nav {
+.master-nav {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   flex: 1;
 }
 
-.superadmin-nav .nav-item {
+.master-nav .nav-item {
   display: flex;
   align-items: center;
   gap: 0.8rem;
@@ -80,20 +80,20 @@
   transition: all 0.2s ease;
 }
 
-.superadmin-nav .nav-item:hover {
+.master-nav .nav-item:hover {
   background: rgba(255, 255, 255, 0.05);
   color: #ffffff;
   transform: translateX(3px);
 }
 
-.superadmin-nav .nav-item.active {
+.master-nav .nav-item.active {
   background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(239, 68, 68, 0.1) 100%);
   color: #f59e0b;
   border-left: 3px solid #f59e0b;
   font-weight: 600;
 }
 
-.superadmin-sidebar-footer {
+.master-sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding-top: 1rem;
 }
@@ -118,7 +118,7 @@
   border-color: rgba(239, 68, 68, 0.4);
 }
 
-.superadmin-content {
+.master-content {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -127,7 +127,7 @@
               radial-gradient(circle at 20% 80%, rgba(59, 130, 246, 0.04) 0%, transparent 50%);
 }
 
-.superadmin-topbar {
+.master-topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -183,7 +183,7 @@
   50% { opacity: 0.4; }
 }
 
-.superadmin-page-body {
+.master-page-body {
   padding: 2.5rem;
   flex: 1;
 }

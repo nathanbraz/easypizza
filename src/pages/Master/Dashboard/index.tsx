@@ -10,7 +10,7 @@ interface DashboardMetrics {
   systemStatus: string;
 }
 
-export default function SuperAdminDashboard() {
+export default function MasterDashboard() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,7 +21,7 @@ export default function SuperAdminDashboard() {
   const fetchMetrics = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/superadmin/dashboard');
+      const res = await api.get('/master/dashboard');
       setMetrics(res.data);
     } catch (error) {
       console.error("Erro ao carregar métricas:", error);
@@ -40,7 +40,7 @@ export default function SuperAdminDashboard() {
   }
 
   return (
-    <div className="superadmin-dashboard">
+    <div className="master-dashboard">
       <div className="dashboard-header">
         <h2>Visão Geral do Sistema</h2>
         <p>Métricas globais de todas as empresas clientes e saúde do SaaS.</p>

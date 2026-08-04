@@ -9,10 +9,13 @@ import CatalogManager from './pages/Admin/Catalog';
 import CouriersManager from './pages/Admin/Couriers';
 import SettingsManager from './pages/Admin/Settings';
 
-import SuperAdminLayout from './pages/SuperAdmin/Layout/SuperAdminLayout';
-import TenantsDashboard from './pages/SuperAdmin/Tenants';
-import SuperAdminDashboard from './pages/SuperAdmin/Dashboard';
-import { isSuperAdmin, api, getTenantSlugFromUrl } from './lib/api';
+import MasterLayout from './pages/Master/Layout/MasterLayout';
+import MasterDashboard from './pages/Master/Dashboard';
+import TenantsList from './pages/Master/Tenants';
+import MasterRoles from './pages/Master/Roles';
+import MasterUsers from './pages/Master/Users';
+
+import { isMaster, api, getTenantSlugFromUrl } from './lib/api';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Auth/Login';
@@ -20,10 +23,10 @@ import Login from './pages/Auth/Login';
 import './index.css';
 
 function App() {
-  const superAdmin = isSuperAdmin();
+  const master = isMaster();
   const [tenantNotFound, setTenantNotFound] = useState(false);
   const [tenantSuspended, setTenantSuspended] = useState(false);
-  const [isValidating, setIsValidating] = useState(!superAdmin);
+  const [isValidating, setIsValidating] = useState(!master);
 
   const hostname = window.location.hostname;
   const isSubdomain = hostname.includes('.') && 
@@ -31,7 +34,7 @@ function App() {
                       !hostname.startsWith('localhost') && 
                       !hostname.startsWith('api.') && 
                       !hostname.startsWith('admin.') && 
-                      !hostname.startsWith('superadmin.');
+                      !hostname.startsWith('master.');
 
   // Componente auxiliar para redirecionar mantendo a querystring (ex: ?t=token)
   const RedirectWithQuery = () => {
@@ -47,7 +50,7 @@ function App() {
     window.addEventListener('tenant-suspended', handleSuspended);
     
     // Dispara uma requisição leve apenas para validar o tenant antes de renderizar a UI
-    if (!superAdmin) {
+    if (!master) {
       const slug = getTenantSlugFromUrl();
       api.get(`/menu/${slug}`) // endpoint público e real (MenuController)
         .then(() => setIsValidating(false))
@@ -62,19 +65,20 @@ function App() {
       window.removeEventListener('tenant-not-found', handleNotFound);
       window.removeEventListener('tenant-suspended', handleSuspended);
     };
-  }, [superAdmin]);
+  }, [master]);
 
-  if (superAdmin) {
+  if (master) {
     return (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route element={<ProtectedRoute requiredScope="Master" />}>
-              <Route path="/" element={<SuperAdminLayout />}>
-                <Route index element={<SuperAdminDashboard />} />
-                <Route path="tenants" element={<TenantsDashboard />} />
-                <Route path="settings" element={<div style={{ padding: '2rem', color: '#fff' }}><h2>Configurações Globais do SaaS (Em breve)</h2></div>} />
+              <Route element={<MasterLayout />}>
+                <Route path="/" element={<MasterDashboard />} />
+                <Route path="/master/tenants" element={<TenantsList />} />
+                <Route path="/master/roles" element={<MasterRoles />} />
+                <Route path="/master/users" element={<MasterUsers />} />
               </Route>
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
@@ -102,7 +106,7 @@ function App() {
           Este estabelecimento encontra-se temporariamente suspenso devido a pendências financeiras ou administrativas com a plataforma.
         </p>
         <p style={{ color: '#a0aabf', marginTop: '1rem', fontWeight: 'bold' }}>
-          Se você é o proprietário, acesse o painel SuperAdmin ou entre em contato com o suporte para regularizar a situação.
+          Se você é o proprietário, acesse o painel Master ou entre em contato com o suporte para regularizar a situação.
         </p>
       </div>
     );

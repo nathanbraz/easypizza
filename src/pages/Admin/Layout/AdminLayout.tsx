@@ -17,7 +17,7 @@ export default function AdminLayout() {
 
   useEffect(() => {
     // Busca avisos globais do SaaS
-    api.get('/superadmin/dashboard/settings')
+    api.get('/master/dashboard/settings')
       .then(res => {
         if (res.data?.data?.isAnnouncementActive && res.data.data.globalAnnouncementMessage) {
           setGlobalMsg(res.data.data.globalAnnouncementMessage);
