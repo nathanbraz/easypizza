@@ -11,63 +11,122 @@
   font-weight: 500;
 }
 
-.permissions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+.permissions-groups {
+  column-count: 2;
+  column-gap: 1.5rem;
+  display: block;
+}
+
+.permission-group {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
+  background: rgba(30, 41, 59, 0.3);
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 1.5rem;
+}
+
+.permission-group-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f59e0b; /* Laranja do tema Master */
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.permissions-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .permission-item {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: rgba(30, 41, 59, 0.5);
-  border: 1px solid #334155;
+  gap: 1rem; /* Aumentado o espaço entre o switch e o texto */
+  padding: 0.6rem 0.5rem;
   border-radius: 0.5rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .permission-item:hover {
-  background: rgba(30, 41, 59, 0.8);
-  border-color: #475569;
+  background: rgba(255, 255, 255, 0.05);
 }
 
-.permission-item input[type="checkbox"] {
-  width: 1rem;
-  height: 1rem;
-  border-radius: 0.25rem;
-  background: #0f172a;
-  border: 1px solid #475569;
-  appearance: none;
-  cursor: pointer;
+.permission-name {
+  font-size: 0.85rem;
+  color: #e2e8f0;
+  font-weight: 500;
+  user-select: none;
+  margin-left: 0.75rem; /* Força espaçamento rígido para desgrudar do botão */
+  transform: translateY(1px); /* Desce 1px para centralizar com o miolo do botão */
+}
+
+/* Toggle Switch Styles (Premium SaaS Design) */
+.permission-switch {
   position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
-.permission-item input[type="checkbox"]:checked {
-  background: #6366f1;
-  border-color: #6366f1;
+.permission-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
 }
 
-.permission-item input[type="checkbox"]:checked::after {
-  content: '';
+.permission-switch .slider {
   position: absolute;
-  left: 4px;
-  top: 1px;
-  width: 5px;
-  height: 10px;
-  border: solid white;
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #334155;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 34px;
 }
 
-.permission-item input[type="checkbox"]:disabled {
+.permission-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.permission-switch input:checked + .slider {
+  background-color: #f59e0b;
+}
+
+.permission-switch input:focus + .slider {
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+.permission-switch input:checked + .slider:before {
+  transform: translateX(16px);
+}
+
+.permission-switch input:disabled + .slider {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-.permission-item span {
-  font-size: 0.875rem;
-  color: #cbd5e1;
+.permission-item input:disabled ~ .permission-name {
+  opacity: 0.5;
 }
+

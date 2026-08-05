@@ -1,10 +1,10 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Building2, ShieldAlert, Settings, LogOut } from 'lucide-react';
+import { Building2, ShieldAlert, Settings, LogOut, Users } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import './MasterLayout.css';
 
 export default function MasterLayout() {
-  const { logout } = useAuth();
+  const { logout, hasPermission } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -29,18 +29,24 @@ export default function MasterLayout() {
             <ShieldAlert size={20} />
             <span>Dashboard</span>
           </NavLink>
-          <NavLink to="/master/tenants" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <Building2 size={20} />
-            <span>Lojistas (Tenants)</span>
-          </NavLink>
-          <NavLink to="/master/users" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <ShieldAlert size={20} />
-            <span>Equipe Master</span>
-          </NavLink>
-          <NavLink to="/master/roles" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-            <Settings size={20} />
-            <span>Cargos e Permissões</span>
-          </NavLink>
+          {hasPermission('Tenants:View') && (
+            <NavLink to="/master/tenants" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Building2 size={20} />
+              <span>Lojistas (Tenants)</span>
+            </NavLink>
+          )}
+          {hasPermission('MasterTeam:View') && (
+            <NavLink to="/master/users" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Users size={20} />
+              <span>Equipe Master</span>
+            </NavLink>
+          )}
+          {hasPermission('MasterRoles:View') && (
+            <NavLink to="/master/roles" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Settings size={20} />
+              <span>Cargos e Permissões</span>
+            </NavLink>
+          )}
         </nav>
 
         <div className="master-sidebar-footer">
@@ -70,3 +76,4 @@ export default function MasterLayout() {
     </div>
   );
 }
+

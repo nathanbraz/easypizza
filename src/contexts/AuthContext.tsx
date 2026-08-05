@@ -8,6 +8,7 @@ export interface UserInfo {
   role: string;
   scope: 'Master' | 'Tenant';
   tenantSlug?: string;
+  permissions: string[];
 }
 
 interface AuthContextType {
@@ -15,6 +16,25 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (token: string, userInfo: UserInfo) => void;
   logout: () => void;
+  hasPermission: (permission: string) => boolean;
+}
+
+/**
+ * Decodifica o payload do JWT e extrai as claims "Permission".
+ * Não valida a assinatura (isso é responsabilidade do backend).
+ */
+function decodePermissionsFromToken(token: string): string[] {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const payload = JSON.parse(atob(payloadBase64));
+
+    // As claims "Permission" podem vir como string (1 permissão) ou array (várias)
+    if (!payload.Permission) return [];
+    if (Array.isArray(payload.Permission)) return payload.Permission;
+    return [payload.Permission];
+  } catch {
+    return [];
+  }
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -25,7 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const storedToken = localStorage.getItem('@EasyPizza:Token');
     if (storedUser && storedToken) {
       try {
-        return JSON.parse(storedUser);
+        const parsed = JSON.parse(storedUser);
+        // Se o user antigo não tem permissions, decodifica do token
+        if (!parsed.permissions) {
+          parsed.permissions = decodePermissionsFromToken(storedToken);
+          localStorage.setItem('@EasyPizza:User', JSON.stringify(parsed));
+        }
+        return parsed;
       } catch {
         return null;
       }
@@ -35,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
 
-    // 2. Escuta o evento global do interceptor Axios para logout forçado
+    // Escuta o evento global do interceptor Axios para logout forçado
     const handleUnauthorized = () => {
       logout();
     };
@@ -47,9 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = (token: string, userInfo: UserInfo) => {
+    // Extrair permissões do JWT automaticamente
+    const permissions = decodePermissionsFromToken(token);
+    const userWithPermissions = { ...userInfo, permissions };
+
     localStorage.setItem('@EasyPizza:Token', token);
-    localStorage.setItem('@EasyPizza:User', JSON.stringify(userInfo));
-    setUser(userInfo);
+    localStorage.setItem('@EasyPizza:User', JSON.stringify(userWithPermissions));
+    setUser(userWithPermissions);
   };
 
   const logout = async () => {
@@ -67,8 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const hasPermission = (permission: string): boolean => {
+    if (!user) return false;
+    return user.permissions?.includes(permission) ?? false;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );
@@ -81,3 +116,4 @@ export function useAuth() {
   }
   return context;
 }
+

@@ -15,7 +15,10 @@ interface User {
   role: string | null;
 }
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 export default function MasterUsers() {
+  const { hasPermission } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,10 +113,12 @@ export default function MasterUsers() {
           <h1 className="page-title">Equipe Master</h1>
           <p className="page-subtitle">Gerencie os usuários administrativos do SaaS</p>
         </div>
-        <button className="btn-primary" onClick={openModal}>
-          <Plus size={20} />
-          Novo Usuário
-        </button>
+        {hasPermission('MasterTeam:Create') && (
+          <button className="btn-primary" onClick={openModal}>
+            <Plus size={20} />
+            Novo Usuário
+          </button>
+        )}
       </header>
 
       <div className="card-container mt-6">
@@ -146,13 +151,15 @@ export default function MasterUsers() {
                 </td>
                 <td className="text-right">
                   <div className="flex justify-end gap-3">
-                    <button 
-                      onClick={() => handleDelete(user)}
-                      className="btn-icon text-red-400 hover:text-red-300 hover:bg-red-900/30"
-                      title="Excluir"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+                    {hasPermission('MasterTeam:Delete') && (
+                      <button 
+                        onClick={() => handleDelete(user)}
+                        className="btn-icon text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                        title="Excluir"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -173,7 +180,7 @@ export default function MasterUsers() {
           <div className="modal-content w-full max-w-md" style={{ height: 'fit-content' }}>
             <header className="modal-header">
               <h2>Novo Usuário</h2>
-              <button className="btn-icon" onClick={closeModal}>
+              <button type="button" className="btn-icon" onClick={closeModal}>
                 <X size={20} />
               </button>
             </header>
@@ -186,90 +193,90 @@ export default function MasterUsers() {
                   </div>
                 )}
 
-              <div className="form-group">
-                <label>Nome Completo</label>
-                <div style={{ position: 'relative' }}>
-                  <UserIcon className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Ex: Carlos Silva"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    style={{ paddingLeft: '2.5rem' }}
-                  />
+                <div className="form-group">
+                  <label>Nome Completo</label>
+                  <div style={{ position: 'relative' }}>
+                    <UserIcon className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="Ex: Carlos Silva"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      style={{ paddingLeft: '2.5rem' }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label>E-mail Corporativo</label>
-                <div style={{ position: 'relative' }}>
-                  <Mail className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
-                  <input
-                    type="email"
-                    className="form-input"
-                    placeholder="carlos@easypizza.com.br"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    style={{ paddingLeft: '2.5rem' }}
-                  />
+                <div className="form-group">
+                  <label>E-mail Corporativo</label>
+                  <div style={{ position: 'relative' }}>
+                    <Mail className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+                    <input
+                      type="email"
+                      className="form-input"
+                      placeholder="carlos@easypizza.com.br"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      style={{ paddingLeft: '2.5rem' }}
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label>Senha Inicial</label>
-                <div style={{ position: 'relative' }}>
-                  <Lock className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    className="form-input"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '14px',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#a0aabf',
-                      padding: 0,
-                      display: 'flex',
-                      alignItems: 'center'
-                    }}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+                <div className="form-group">
+                  <label>Senha Inicial</label>
+                  <div style={{ position: 'relative' }}>
+                    <Lock className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      className="form-input"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        top: '14px',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#a0aabf',
+                        padding: 0,
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="form-group">
-                <label>Cargo (Role)</label>
-                <div style={{ position: 'relative' }}>
-                  <Shield className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
-                  <select 
-                    className="form-input"
-                    value={roleName}
-                    onChange={(e) => setRoleName(e.target.value)}
-                    required
-                    style={{ paddingLeft: '2.5rem', appearance: 'none' }}
-                  >
-                    <option value="" disabled>Selecione um cargo</option>
-                    {roles.map(role => (
-                      <option key={role.id} value={role.name}>{role.name}</option>
-                    ))}
-                  </select>
+                <div className="form-group">
+                  <label>Cargo (Role)</label>
+                  <div style={{ position: 'relative' }}>
+                    <Shield className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+                    <select 
+                      className="form-input"
+                      value={roleName}
+                      onChange={(e) => setRoleName(e.target.value)}
+                      required
+                      style={{ paddingLeft: '2.5rem', appearance: 'none' }}
+                    >
+                      <option value="" disabled>Selecione um cargo</option>
+                      {roles.map(role => (
+                        <option key={role.id} value={role.name}>{role.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
-              </div>
 
               </div>
 

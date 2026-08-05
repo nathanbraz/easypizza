@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
+import { useAuth } from '../../../contexts/AuthContext';
 import './Tenants.css';
 
 interface Tenant {
@@ -15,6 +16,7 @@ interface Tenant {
 }
 
 export default function TenantsDashboard() {
+  const { hasPermission } = useAuth();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -155,20 +157,24 @@ export default function TenantsDashboard() {
         </div>
         
         <div className="header-buttons">
-          <button className="btn-secondary" onClick={handleSyncAllTenants}>
-            <Database size={18} />
-            <span>Sincronizar Todos os Bancos</span>
-          </button>
+          {hasPermission('Tenants:Edit') && (
+            <button className="btn-secondary" onClick={handleSyncAllTenants}>
+              <Database size={18} />
+              <span>Sincronizar Todos os Bancos</span>
+            </button>
+          )}
           
           <button className="btn-secondary" onClick={fetchTenants} disabled={loading}>
             <RefreshCw size={18} className={loading ? "spin" : ""} />
             <span>Atualizar Lista</span>
           </button>
           
-          <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={18} />
-            <span>Cadastrar Empresa</span>
-          </button>
+          {hasPermission('Tenants:Create') && (
+            <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
+              <Plus size={18} />
+              <span>Cadastrar Empresa</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -227,14 +233,16 @@ export default function TenantsDashboard() {
 
               <div className="tenant-card-footer">
                 <div className="tenant-actions mt-4">
-                  <button 
-                    className="btn-secondary btn-sm"
-                    onClick={() => handleMigrateTenant(tenant.slug, tenant.name)}
-                    disabled={migratingSlug === tenant.slug}
-                  >
-                    <RefreshCw size={14} className={migratingSlug === tenant.slug ? "spin" : ""} />
-                    <span>Sync DB</span>
-                  </button>
+                  {hasPermission('Tenants:Edit') && (
+                    <button 
+                      className="btn-secondary btn-sm"
+                      onClick={() => handleMigrateTenant(tenant.slug, tenant.name)}
+                      disabled={migratingSlug === tenant.slug}
+                    >
+                      <RefreshCw size={14} className={migratingSlug === tenant.slug ? "spin" : ""} />
+                      <span>Sync DB</span>
+                    </button>
+                  )}
                   
                   <a href={getTenantUrl(tenant.slug)} target="_blank" rel="noopener noreferrer" className="btn-secondary btn-sm" title="Abrir Cardápio Público">
                     <ExternalLink size={14} />
@@ -246,14 +254,16 @@ export default function TenantsDashboard() {
                     <span>Acessar Painel</span>
                   </a>
 
-                  <button 
-                    className={`btn-secondary btn-sm ${tenant.isActive ? 'btn-danger-outline' : 'btn-success-outline'}`}
-                    onClick={() => handleToggleStatus(tenant.slug, tenant.isActive)}
-                    style={{ marginLeft: 'auto', borderColor: tenant.isActive ? '#ff4d4d' : '#4caf50', color: tenant.isActive ? '#ff4d4d' : '#4caf50' }}
-                  >
-                    {tenant.isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
-                    <span>{tenant.isActive ? 'Suspender' : 'Ativar'}</span>
-                  </button>
+                  {hasPermission('Tenants:Block') && (
+                    <button 
+                      className={`btn-secondary btn-sm ${tenant.isActive ? 'btn-danger-outline' : 'btn-success-outline'}`}
+                      onClick={() => handleToggleStatus(tenant.slug, tenant.isActive)}
+                      style={{ marginLeft: 'auto', borderColor: tenant.isActive ? '#ff4d4d' : '#4caf50', color: tenant.isActive ? '#ff4d4d' : '#4caf50' }}
+                    >
+                      {tenant.isActive ? <Ban size={14} /> : <CheckCircle2 size={14} />}
+                      <span>{tenant.isActive ? 'Suspender' : 'Ativar'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

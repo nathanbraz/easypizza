@@ -55,7 +55,8 @@ export default function Login() {
           email: payload.email,
           role: payload.role,
           scope: payload.scope,
-          tenantSlug: payload.tenantSlug
+          tenantSlug: payload.tenantSlug,
+          permissions: [] // Preenchido automaticamente pelo AuthContext via JWT
         });
 
         // Redireciona com base no escopo e modo
@@ -92,7 +93,7 @@ export default function Login() {
       <div className="login-card">
         <div className="login-header">
           {masterMode ? (
-            <span className="tenant-badge" style={{ background: 'rgba(236, 72, 153, 0.2)', color: '#fbcfe8', borderColor: 'rgba(236, 72, 153, 0.3)' }}>
+            <span className="tenant-badge master">
               Acesso Global
             </span>
           ) : (
