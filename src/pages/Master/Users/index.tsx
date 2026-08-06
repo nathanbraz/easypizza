@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../../lib/api';
-import { Plus, Trash2, Shield, X, Loader2, User as UserIcon, Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Shield, X, Loader2, User as UserIcon, Mail, Lock, Eye, EyeOff, Edit2, Ban, CheckCircle } from 'lucide-react';
 import './MasterUsers.css';
 
 interface Role {
@@ -13,6 +13,7 @@ interface User {
   name: string;
   email: string;
   role: string | null;
+  isActive: boolean;
 }
 
 import { useAuth } from '../../../contexts/AuthContext';
@@ -24,6 +25,7 @@ export default function MasterUsers() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -52,12 +54,21 @@ export default function MasterUsers() {
     }
   };
 
-  const openModal = () => {
+  const openModal = (user?: User) => {
     setError(null);
-    setName('');
-    setEmail('');
-    setPassword('');
-    setRoleName('');
+    if (user) {
+      setEditingUserId(user.id);
+      setName(user.name);
+      setEmail(user.email);
+      setPassword('');
+      setRoleName(user.role || '');
+    } else {
+      setEditingUserId(null);
+      setName('');
+      setEmail('');
+      setPassword('');
+      setRoleName('');
+    }
     setIsModalOpen(true);
   };
 
@@ -71,19 +82,38 @@ export default function MasterUsers() {
     setIsSubmitting(true);
 
     try {
-      await api.post('/master/users', {
-        name,
-        email,
-        password,
-        roleName
-      });
+      if (editingUserId) {
+        await api.put(`/master/users/${editingUserId}`, {
+          name,
+          roleName
+        });
+      } else {
+        await api.post('/master/users', {
+          name,
+          email,
+          password,
+          roleName
+        });
+      }
       
       await fetchData();
       closeModal();
     } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.errors?.[0] || 'Ocorreu um erro ao criar usuário.');
+      setError(err.response?.data?.message || err.response?.data?.errors?.[0] || 'Ocorreu um erro ao salvar usuário.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (user: User) => {
+    const action = user.isActive ? 'bloquear' : 'desbloquear';
+    if (window.confirm(`Tem certeza que deseja ${action} o usuário ${user.name}?`)) {
+      try {
+        await api.patch(`/master/users/${user.id}/toggle-status`);
+        await fetchData();
+      } catch (err: any) {
+        alert(err.response?.data?.message || `Erro ao ${action} usuário.`);
+      }
     }
   };
 
@@ -128,6 +158,7 @@ export default function MasterUsers() {
               <th>Usuário</th>
               <th>E-mail</th>
               <th>Cargo</th>
+              <th>Status</th>
               <th className="text-right">Ações</th>
             </tr>
           </thead>
@@ -135,11 +166,11 @@ export default function MasterUsers() {
             {users.map(user => (
               <tr key={user.id}>
                 <td>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-brand">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div className="user-avatar">
                       <UserIcon size={16} />
                     </div>
-                    <span className="font-medium text-white">{user.name}</span>
+                    <span style={{ fontWeight: 500, color: 'white' }}>{user.name}</span>
                   </div>
                 </td>
                 <td className="text-gray-400">{user.email}</td>
@@ -149,12 +180,35 @@ export default function MasterUsers() {
                     {user.role || 'Sem Cargo'}
                   </span>
                 </td>
+                <td>
+                  <span className="badge-role" style={{ backgroundColor: user.isActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(100, 116, 139, 0.2)', color: user.isActive ? '#4ade80' : '#94a3b8', border: 'none' }}>
+                    {user.isActive ? 'Ativo' : 'Bloqueado'}
+                  </span>
+                </td>
                 <td className="text-right">
-                  <div className="flex justify-end gap-3">
+                  <div className="actions-container">
+                    {hasPermission('MasterTeam:Edit') && (
+                      <button 
+                        onClick={() => openModal(user)}
+                        className="btn-icon icon-edit"
+                        title="Editar"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                    )}
+                    {hasPermission('MasterTeam:Block') && (
+                      <button 
+                        onClick={() => handleToggleStatus(user)}
+                        className={`btn-icon ${user.isActive ? 'icon-block' : 'icon-unblock'}`}
+                        title={user.isActive ? "Bloquear" : "Desbloquear"}
+                      >
+                        {user.isActive ? <Ban size={18} /> : <CheckCircle size={18} />}
+                      </button>
+                    )}
                     {hasPermission('MasterTeam:Delete') && (
                       <button 
                         onClick={() => handleDelete(user)}
-                        className="btn-icon text-red-400 hover:text-red-300 hover:bg-red-900/30"
+                        className="btn-icon icon-delete"
                         title="Excluir"
                       >
                         <Trash2 size={18} />
@@ -179,7 +233,7 @@ export default function MasterUsers() {
         <div className="modal-overlay">
           <div className="modal-content w-full max-w-md" style={{ height: 'fit-content' }}>
             <header className="modal-header">
-              <h2>Novo Usuário</h2>
+              <h2>{editingUserId ? 'Editar Usuário' : 'Novo Usuário'}</h2>
               <button type="button" className="btn-icon" onClick={closeModal}>
                 <X size={20} />
               </button>
@@ -220,44 +274,47 @@ export default function MasterUsers() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      style={{ paddingLeft: '2.5rem' }}
+                      disabled={!!editingUserId}
+                      style={{ paddingLeft: '2.5rem', opacity: editingUserId ? 0.6 : 1, cursor: editingUserId ? 'not-allowed' : 'text' }}
                     />
                   </div>
                 </div>
 
-                <div className="form-group">
-                  <label>Senha Inicial</label>
-                  <div style={{ position: 'relative' }}>
-                    <Lock className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      className="form-input"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{
-                        position: 'absolute',
-                        right: '12px',
-                        top: '14px',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: '#a0aabf',
-                        padding: 0,
-                        display: 'flex',
-                        alignItems: 'center'
-                      }}
-                    >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
+                {!editingUserId && (
+                  <div className="form-group">
+                    <label>Senha Inicial</label>
+                    <div style={{ position: 'relative' }}>
+                      <Lock className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className="form-input"
+                        placeholder="••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        style={{ paddingLeft: '2.5rem', paddingRight: '2.5rem' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: 'absolute',
+                          right: '12px',
+                          top: '14px',
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          color: '#a0aabf',
+                          padding: 0,
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="form-group">
                   <label>Cargo (Role)</label>
@@ -285,7 +342,7 @@ export default function MasterUsers() {
                   Cancelar
                 </button>
                 <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : 'Criar Usuário'}
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : (editingUserId ? 'Salvar Alterações' : 'Criar Usuário')}
                 </button>
               </div>
             </form>
