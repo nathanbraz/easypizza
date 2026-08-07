@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../../../lib/api';
+import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import { Plus, Trash2, Shield, X, Loader2, User as UserIcon, AtSign, Lock, Eye, EyeOff, Edit2, Ban, CheckCircle } from 'lucide-react';
-import './MasterUsers.css';
+import './TenantUsers.css';
 
 interface Role {
   id: string;
@@ -18,8 +18,9 @@ interface User {
 
 import { useAuth } from '../../../contexts/AuthContext';
 
-export default function MasterUsers() {
+export default function TenantUsers() {
   const { hasPermission } = useAuth();
+  const tenantSlug = getTenantSlugFromUrl();
   const [users, setUsers] = useState<User[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,8 +43,8 @@ export default function MasterUsers() {
     setIsLoading(true);
     try {
       const [usersRes, rolesRes] = await Promise.all([
-        api.get('/master/users'),
-        api.get('/master/roles')
+        api.get(`/users/${tenantSlug}`),
+        api.get(`/roles/${tenantSlug}`)
       ]);
       setUsers(usersRes.data.data);
       setRoles(rolesRes.data.data);
@@ -83,12 +84,12 @@ export default function MasterUsers() {
 
     try {
       if (editingUserId) {
-        await api.put(`/master/users/${editingUserId}`, {
+        await api.put(`/users/${tenantSlug}/${editingUserId}`, {
           name,
           roleName
         });
       } else {
-        await api.post('/master/users', {
+        await api.post(`/users/${tenantSlug}`, {
           name,
           userName: userName.toLowerCase(),
           password,
@@ -109,7 +110,7 @@ export default function MasterUsers() {
     const action = user.isActive ? 'bloquear' : 'desbloquear';
     if (window.confirm(`Tem certeza que deseja ${action} o usuário ${user.name}?`)) {
       try {
-        await api.patch(`/master/users/${user.id}/toggle-status`);
+        await api.patch(`/users/${tenantSlug}/${user.id}/toggle-status`);
         await fetchData();
       } catch (err: any) {
         alert(err.response?.data?.message || `Erro ao ${action} usuário.`);
@@ -120,7 +121,7 @@ export default function MasterUsers() {
   const handleDelete = async (user: User) => {
     if (window.confirm(`Tem certeza que deseja excluir o usuário ${user.name}?`)) {
       try {
-        await api.delete(`/master/users/${user.id}`);
+        await api.delete(`/users/${tenantSlug}/${user.id}`);
         await fetchData();
       } catch (err: any) {
         alert(err.response?.data?.message || 'Erro ao excluir usuário.');
@@ -140,10 +141,10 @@ export default function MasterUsers() {
     <div className="page-container">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Equipe Master</h1>
-          <p className="page-subtitle">Gerencie os usuários administrativos do SaaS</p>
+          <h1 className="page-title">Equipe da Loja</h1>
+          <p className="page-subtitle">Gerencie os funcionários e acessos</p>
         </div>
-        {hasPermission('MasterTeam:Create') && (
+        {hasPermission('Team:Create') && (
           <button className="btn-primary" onClick={openModal}>
             <Plus size={20} />
             Novo Usuário
@@ -187,7 +188,7 @@ export default function MasterUsers() {
                 </td>
                 <td className="text-right">
                   <div className="actions-container">
-                    {hasPermission('MasterTeam:Edit') && (
+                    {hasPermission('Team:Edit') && (
                       <button 
                         onClick={() => openModal(user)}
                         className="btn-icon icon-edit"
@@ -196,7 +197,7 @@ export default function MasterUsers() {
                         <Edit2 size={18} />
                       </button>
                     )}
-                    {hasPermission('MasterTeam:Block') && (
+                    {hasPermission('Team:Block') && (
                       <button 
                         onClick={() => handleToggleStatus(user)}
                         className={`btn-icon ${user.isActive ? 'icon-block' : 'icon-unblock'}`}
@@ -205,7 +206,7 @@ export default function MasterUsers() {
                         {user.isActive ? <Ban size={18} /> : <CheckCircle size={18} />}
                       </button>
                     )}
-                    {hasPermission('MasterTeam:Delete') && (
+                    {hasPermission('Team:Delete') && (
                       <button 
                         onClick={() => handleDelete(user)}
                         className="btn-icon icon-delete"
@@ -270,7 +271,7 @@ export default function MasterUsers() {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="ex: carlos.silva"
+                      placeholder="ex: joao.silva"
                       value={userName}
                       onChange={(e) => setUserName(e.target.value.toLowerCase())}
                       required

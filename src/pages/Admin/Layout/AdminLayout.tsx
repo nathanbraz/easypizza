@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Pizza, Bike, Settings, LogOut, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Pizza, Bike, Settings, LogOut, Megaphone, Shield, Users } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import './AdminLayout.css';
 
 export default function AdminLayout() {
   const [globalMsg, setGlobalMsg] = useState<string | null>(null);
-  const { logout } = useAuth();
+  const { logout, hasPermission } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -45,6 +45,18 @@ export default function AdminLayout() {
             <Bike size={20} />
             <span>Entregadores</span>
           </NavLink>
+          {hasPermission('Roles:View') && (
+            <NavLink to="/admin/roles" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Shield size={20} />
+              <span>Cargos</span>
+            </NavLink>
+          )}
+          {hasPermission('Team:View') && (
+            <NavLink to="/admin/users" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+              <Users size={20} />
+              <span>Equipe</span>
+            </NavLink>
+          )}
           <NavLink to="/admin/settings" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
             <Settings size={20} />
             <span>Configurações</span>

@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, getTenantSlugFromUrl, isMaster } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Lock, Mail, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Lock, User as UserIcon, Loader2, Eye, EyeOff } from 'lucide-react';
 import './Login.css';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -39,7 +39,7 @@ export default function Login() {
 
     try {
       const response = await api.post('/auth/login', {
-        email,
+        userName: username.toLowerCase(),
         password
       });
 
@@ -50,9 +50,9 @@ export default function Login() {
         
         // Salva no contexto e localStorage
         login(token, {
-          id: payload.email, // backend não retorna id, usamos o email como fallback
+          id: payload.userName, // backend não retorna id, usamos o userName como fallback
           name: payload.name,
-          email: payload.email,
+          userName: payload.userName,
           role: payload.role,
           scope: payload.scope,
           tenantSlug: payload.tenantSlug,
@@ -115,17 +115,18 @@ export default function Login() {
 
         <form onSubmit={handleLogin}>
           <div className="form-group">
-            <label htmlFor="email">E-mail de acesso</label>
+            <label htmlFor="username">Usuário</label>
             <div style={{ position: 'relative' }}>
-              <Mail className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
+              <UserIcon className="absolute left-3 top-3 text-gray-400" size={18} style={{ position: 'absolute', left: '12px', top: '14px', color: '#a0aabf' }} />
               <input
-                id="email"
-                type="email"
+                id="username"
+                type="text"
                 className="form-input"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu usuário"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 required
+                autoComplete="username"
                 style={{ paddingLeft: '2.5rem' }}
               />
             </div>

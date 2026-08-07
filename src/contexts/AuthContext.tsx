@@ -4,7 +4,7 @@ import { api } from '../lib/api';
 export interface UserInfo {
   id: string;
   name: string;
-  email: string;
+  userName: string;
   role: string;
   scope: 'Master' | 'Tenant';
   tenantSlug?: string;

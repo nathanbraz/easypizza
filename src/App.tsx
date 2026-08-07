@@ -8,6 +8,8 @@ import OrdersDashboard from './pages/Admin/Orders';
 import CatalogManager from './pages/Admin/Catalog';
 import CouriersManager from './pages/Admin/Couriers';
 import SettingsManager from './pages/Admin/Settings';
+import TenantRoles from './pages/Tenant/Roles';
+import TenantUsers from './pages/Tenant/Users';
 
 import MasterLayout from './pages/Master/Layout/MasterLayout';
 import MasterDashboard from './pages/Master/Dashboard';
@@ -149,6 +151,8 @@ function App() {
               <Route path="orders" element={<OrdersDashboard />} />
               <Route path="catalog" element={<CatalogManager />} />
               <Route path="couriers" element={<CouriersManager />} />
+              <Route path="roles" element={<TenantRoles />} />
+              <Route path="users" element={<TenantUsers />} />
               <Route path="settings" element={<SettingsManager />} />
             </Route>
           </Route>

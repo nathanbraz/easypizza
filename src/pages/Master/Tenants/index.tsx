@@ -75,7 +75,7 @@ export default function TenantsDashboard() {
         connectionString: connectionString || undefined
       });
 
-      setFeedbackMsg({ text: `Empresa "${name}" cadastrada e banco de dados isolado gerado com sucesso!`, type: 'success' });
+      setFeedbackMsg({ text: `Empresa "${name}" cadastrada com sucesso! Usuário padrão: admin / Senha: Admin@123`, type: 'success' });
       setIsModalOpen(false);
       setName('');
       setSlug('');
@@ -320,7 +320,7 @@ export default function TenantsDashboard() {
 
               <div className="modal-notice">
                 <Database size={18} className="text-accent" />
-                <p>Ao clicar em cadastrar, a API iniciará o <strong>Entity Framework Migrate</strong> para criar o banco de dados físico desta empresa instantaneamente!</p>
+                <p>Ao cadastrar, um usuário <strong>admin</strong> com senha <strong>Admin@123</strong> será criado automaticamente com o cargo de <strong>Administrador</strong>.</p>
               </div>
 
               <div className="modal-footer">
