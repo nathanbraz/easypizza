@@ -356,3 +356,15 @@ input[type="number"] {
   border-radius: var(--radius-md);
   font-size: 0.875rem;
 }
+
+/* Utility Classes */
+.text-right {
+  text-align: right !important;
+}
+.text-center {
+  text-align: center !important;
+}
+.th-actions {
+  text-align: right !important;
+  padding-right: 1.5rem !important; /* aligns perfectly with the icon inside the button */
+}

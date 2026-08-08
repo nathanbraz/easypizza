@@ -493,7 +493,9 @@ export default function SettingsManager() {
                   <th>Limite de Usos</th>
                   <th>Validade</th>
                   <th>Status</th>
-                  <th>Ações</th>
+                  <th>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '0.5rem' }}>Ações</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>

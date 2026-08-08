@@ -160,7 +160,9 @@ export default function TenantUsers() {
               <th>Login</th>
               <th>Cargo</th>
               <th>Status</th>
-              <th className="text-right">Ações</th>
+              <th>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '0.5rem' }}>Ações</div>
+              </th>
             </tr>
           </thead>
           <tbody>

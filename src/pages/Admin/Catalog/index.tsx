@@ -250,7 +250,9 @@ export default function CatalogManager() {
                   <th>Produto</th>
                   <th>Categoria</th>
                   <th>Preço Base</th>
-                  <th>Ações</th>
+                  <th>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '0.5rem' }}>Ações</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -287,7 +289,9 @@ export default function CatalogManager() {
                 <tr>
                   <th>Nome da Categoria</th>
                   <th>Ordem</th>
-                  <th>Ações</th>
+                  <th>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '0.5rem' }}>Ações</div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
