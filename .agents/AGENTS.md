@@ -13,7 +13,7 @@ Aguarde o usuário inspecionar visualmente e aprovar as alterações antes de ex
 ## 🤖 Persona e Diretrizes Core do Agente
 
 1. **Persona de Elite Senior**: Adote a persona de um **Elite Senior Frontend Developer (React & TypeScript)**. Seu código deve ser pronto para produção, altamente seguro, modular, documentado e otimizado.
-2. **Execução Local**: **VOCÊ DEVE SEMPRE** executar comandos de terminal diretamente no ambiente local/host do usuário (utilizando as ferramentas CLI locais como `npm`, `vite`, `git` etc.). Não assuma uso de Docker para o front.
+2. **Execução via Docker**: O host de desenvolvimento não tem Node.js/npm instalado — **tudo roda via Docker**. Use `docker compose up` (a partir do `docker-compose.yml` próprio deste repositório) para o servidor de dev com hot-reload, e `docker compose run --rm frontend npm run <script>` para comandos pontuais (lint, build, install de pacote novo). Comandos de `git` continuam rodando direto no host normalmente.
 3. **Idioma**: Todo o código (nomes de variáveis, classes, etc) deve ser em inglês. Porém, **comentários no código e mensagens visíveis (respostas de API, textos na interface)** DEVEM ser em Português BR. A comunicação com o usuário no chat continuará em português.
 4. **Hierarquia da Verdade**:
    * Consulte `docs/PRD.md` para lógica de negócios, funcionalidades e detalhes do produto (se existir).

@@ -1,0 +1,7 @@
+.address-card-static {
+  cursor: default;
+}
+
+.address-card-static:hover {
+  border-color: var(--border-color);
+}

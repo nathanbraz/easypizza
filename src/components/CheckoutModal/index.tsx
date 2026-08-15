@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, CheckCircle, Ticket, MapPin, ChevronRight, ChevronLeft, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { X, CheckCircle, Ticket, MapPin, ChevronRight, ChevronLeft, Trash2, Plus, Minus, ShoppingBag, Pencil } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './CheckoutModal.css';
 import ProductModal from '../ProductModal';
+import AddressForm from '../AddressForm';
 import { formatCurrency } from '../../utils/formatCurrency';
 
 interface CheckoutModalProps {
@@ -46,38 +47,24 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
     if (step === 3) fetchPaymentTypes();
   }, [step]);
 
-  // Formulário de Endereço preenchido com endereço salvo do cliente (se houver)
+  // Endereços salvos do cliente, carregados junto com a sessão (ver SessionInfoResponse.Addresses)
   const [customerInfo] = useState<any | null>(() => {
     const saved = localStorage.getItem('@EasyPizza:CustomerInfo');
     return saved ? JSON.parse(saved) : null;
   });
 
-  const [cep, setCep] = useState(() => {
-    let initialCep = customerInfo?.defaultAddress?.zipCode || '76400000';
-    let raw = initialCep.replace(/\D/g, '');
-    if (raw.length > 5) {
-      return raw.substring(0, 5) + '-' + raw.substring(5, 8);
-    }
-    return raw;
+  const [addresses, setAddresses] = useState<any[]>(() => customerInfo?.addresses || []);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(() => {
+    const list: any[] = customerInfo?.addresses || [];
+    const defaultAddr = list.find((a: any) => a.isDefault) || list[0];
+    return defaultAddr?.id || null;
   });
-  const [isNoNumber, setIsNoNumber] = useState(false);
-  const [address, setAddress] = useState(() => {
-    if (customerInfo?.defaultAddress) {
-      return {
-        street: customerInfo.defaultAddress.street || '',
-        number: customerInfo.defaultAddress.number || '',
-        neighborhood: customerInfo.defaultAddress.neighborhood || '',
-        city: customerInfo.defaultAddress.city || '',
-        state: customerInfo.defaultAddress.state || '',
-        referencePoint: customerInfo.defaultAddress.complement ? customerInfo.defaultAddress.complement.replace('Ref: ', '') : ''
-      };
-    }
-    return { street: '', number: '', neighborhood: '', city: '', state: '', referencePoint: '' };
-  });
-  const [latitude, setLatitude] = useState<number | null>(() => customerInfo?.defaultAddress?.latitude || null);
-  const [longitude, setLongitude] = useState<number | null>(() => customerInfo?.defaultAddress?.longitude || null);
-  const [locationStatus, setLocationStatus] = useState<string>('');
-  
+  // Sem nenhum endereço salvo, já abre direto no formulário de cadastro
+  const [showAddressForm, setShowAddressForm] = useState<boolean>(() => (customerInfo?.addresses || []).length === 0);
+  // Endereço sendo editado (form em modo edição); null = form em modo "novo endereço"
+  const [editingAddress, setEditingAddress] = useState<any | null>(null);
+  const [submittingOrder, setSubmittingOrder] = useState(false);
+
   const subTotal = cart.reduce((sum, item) => sum + item.finalPrice, 0);
   
   let deliveryFee = 0;
@@ -127,50 +114,6 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
     setCrossSellProduct(drink);
   };
 
-  const fetchAddressByCep = async (cepCode: string) => {
-    if(cepCode.length === 8) {
-       try {
-         const response = await fetch(`https://viacep.com.br/ws/${cepCode}/json/`);
-         const data = await response.json();
-         if (!data.erro) {
-           setAddress(prev => ({
-             ...prev,
-             street: data.logradouro || '',
-             neighborhood: data.bairro || '',
-             city: data.localidade || '',
-             state: data.uf || ''
-           }));
-         }
-       } catch (error) {
-         console.error("Erro ao buscar CEP", error);
-       }
-    }
-  };
-
-  const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationStatus('Geolocalização não é suportada no seu navegador');
-      return;
-    }
-
-    setLocationStatus('Buscando...');
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setLatitude(position.coords.latitude);
-        setLongitude(position.coords.longitude);
-        setLocationStatus('📍 Localização capturada com sucesso!');
-      },
-      () => {
-        setLocationStatus('Não foi possível capturar a localização.');
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0
-      }
-    );
-  };
-
   const handleApplyCoupon = async (codeToApply?: string, isAuto: boolean = false) => {
     const code = codeToApply || couponCode;
     if (!code) return;
@@ -210,48 +153,17 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
   const handleFinishOrder = async () => {
     try {
-      const storedCustomerInfo = localStorage.getItem('@EasyPizza:CustomerInfo');
-      const parsedInfo = storedCustomerInfo ? JSON.parse(storedCustomerInfo) : null;
-      const customerId = parsedInfo?.customerId || localStorage.getItem('@EasyPizza:CustomerId');
-
-      if (!customerId) {
+      if (!customerInfo) {
         alert("Sessão de cliente não encontrada. Por favor, retorne ao WhatsApp para gerar um link de acesso.");
         return;
       }
 
-      let addrId = parsedInfo?.defaultAddress?.id || null;
-
-      // Se for delivery, salva/atualiza endereço do cliente
-      if (orderType === 1) {
-        if (!address.street || (!address.number && !isNoNumber) || !address.neighborhood) {
-          alert("Por favor, preencha a rua, número e bairro do endereço.");
-          return;
-        }
-        try {
-          const addrPayload = {
-            street: address.street,
-            number: isNoNumber ? 'SN' : address.number,
-            neighborhood: address.neighborhood,
-            city: address.city,
-            state: address.state || 'SP',
-            zipCode: cep || '00000000',
-            complement: address.referencePoint ? `Ref: ${address.referencePoint}` : '',
-            latitude: latitude,
-            longitude: longitude
-          };
-          const addrRes = await api.put(`/customers/${tenantSlug}/${customerId}/address`, addrPayload);
-          const createdAddr = addrRes.data.data || addrRes.data;
-          if (createdAddr && (createdAddr.id || createdAddr.Id)) {
-            addrId = createdAddr.id || createdAddr.Id;
-            if (parsedInfo) {
-              parsedInfo.defaultAddress = createdAddr;
-              localStorage.setItem('@EasyPizza:CustomerInfo', JSON.stringify(parsedInfo));
-            }
-          }
-        } catch (addrErr) {
-          console.error("Erro ao salvar endereço", addrErr);
-        }
+      if (orderType === 1 && !selectedAddressId) {
+        alert("Selecione um endereço de entrega.");
+        return;
       }
+
+      setSubmittingOrder(true);
 
       // POST order to API
       const itemsPayload = cart.map(item => ({
@@ -281,28 +193,26 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       const isCash = selectedPayment && selectedPayment.name.toLowerCase().includes('dinheiro');
 
       const orderPayload = {
-        customerId: customerId,
-        customerAddressId: orderType === 1 ? addrId : null,
+        customerAddressId: orderType === 1 ? selectedAddressId : null,
         type: orderType,
         paymentTypeId: paymentTypeId,
         couponCode: couponCode || null,
         changeFor: (isCash && changeFor) ? Number(changeFor) : null,
         items: itemsPayload
       };
-      
+
       const res = await api.post(`/orders/${tenantSlug}`, orderPayload);
       const createdOrder = res.data.data || res.data;
-      
+
       if (createdOrder && (createdOrder.id || createdOrder.Id)) {
         localStorage.setItem('@EasyPizza:LastOrderId', createdOrder.id || createdOrder.Id);
-      }
-      if (customerId) {
-        localStorage.setItem('@EasyPizza:CustomerId', customerId);
       }
 
       onSuccess(createdOrder);
     } catch (err: any) {
       alert(err.response?.data?.error || "Erro ao finalizar pedido");
+    } finally {
+      setSubmittingOrder(false);
     }
   };
 
@@ -490,98 +400,72 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
           {/* STEP 2: ENDEREÇO */}
           {step === 2 && (
              <div className="step-content animate-fade-in">
-               <section className="checkout-section">
-                 <div className="form-group">
-                   <label>CEP</label>
-                   <div className="input-with-icon">
-                     <MapPin size={18} />
-                     <input 
-                       type="text" 
-                       placeholder="00000-000" 
-                       value={cep} 
-                       maxLength={9}
-                       onChange={(e) => {
-                         let val = e.target.value.replace(/\D/g, '');
-                         if (val.length > 5) val = val.substring(0, 5) + '-' + val.substring(5, 8);
-                         setCep(val);
-                         if (val.replace(/\D/g, '').length === 8) {
-                           fetchAddressByCep(val.replace(/\D/g, ''));
-                         }
-                       }}
-                     />
+               {!showAddressForm && addresses.length > 0 && (
+                 <section className="checkout-section">
+                   <div className="address-list">
+                     {addresses.map((addr: any) => (
+                       <div
+                         key={addr.id}
+                         className={`address-card ${selectedAddressId === addr.id ? 'selected' : ''}`}
+                         onClick={() => setSelectedAddressId(addr.id)}
+                       >
+                         <div className="address-card-header">
+                           <strong>{addr.label || 'Endereço'}</strong>
+                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                             {addr.isDefault && <span className="address-default-badge">Padrão</span>}
+                             <button
+                               type="button"
+                               className="address-edit-btn"
+                               title="Editar endereço"
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 setEditingAddress(addr);
+                                 setShowAddressForm(true);
+                               }}
+                             >
+                               <Pencil size={16} />
+                             </button>
+                           </div>
+                         </div>
+                         <p>{addr.street}, {addr.number === 'SN' ? 'S/N' : addr.number} - {addr.neighborhood}</p>
+                         <p className="address-card-city">{addr.city} - {addr.state}</p>
+                       </div>
+                     ))}
                    </div>
-                 </div>
-                 
-                 <div className="form-row">
-                   <div className="form-group" style={{flex: 2}}>
-                     <label>Rua</label>
-                     <input type="text" value={address.street} onChange={e => setAddress({...address, street: e.target.value})} />
-                   </div>
-                    <div className="form-group" style={{flex: 1.2}}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <label style={{ margin: 0 }}>Número</label>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '0.8rem', color: isNoNumber ? 'var(--primary)' : 'var(--text-muted)', fontWeight: isNoNumber ? 'bold' : 'normal', transition: '0.2s', whiteSpace: 'nowrap' }}>Sem Nº</span>
-                          <label className="custom-toggle">
-                            <input type="checkbox" checked={isNoNumber} onChange={e => setIsNoNumber(e.target.checked)} />
-                            <span className="custom-toggle-slider"></span>
-                          </label>
-                        </div>
-                      </div>
-                      <input 
-                        type="text" 
-                        disabled={isNoNumber} 
-                        value={isNoNumber ? 'SN' : address.number} 
-                        onChange={e => setAddress({...address, number: e.target.value})} 
-                        style={isNoNumber ? { opacity: 0.7 } : {}} 
-                      />
-                    </div>
-                 </div>
-                 
-                 <div className="form-row">
-                   <div className="form-group" style={{flex: 2}}>
-                     <label>Bairro</label>
-                     <input type="text" value={address.neighborhood} onChange={e => setAddress({...address, neighborhood: e.target.value})} />
-                   </div>
-                   <div className="form-group" style={{flex: 2}}>
-                     <label>Cidade</label>
-                     <input type="text" value={address.city} onChange={e => setAddress({...address, city: e.target.value})} />
-                   </div>
-                   <div className="form-group" style={{flex: 1}}>
-                     <label>UF</label>
-                     <input type="text" value={address.state} onChange={e => setAddress({...address, state: e.target.value})} maxLength={2} style={{ textTransform: 'uppercase' }} />
-                   </div>
-                 </div>
+                   <button
+                     type="button"
+                     className="secondary-button"
+                     style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }}
+                     onClick={() => { setEditingAddress(null); setShowAddressForm(true); }}
+                   >
+                     <Plus size={18} /> Adicionar novo endereço
+                   </button>
+                 </section>
+               )}
 
-                 <div className="form-group">
-                   <label>Ponto de Referência (Opcional)</label>
-                   <input type="text" placeholder="Ex: Próximo ao supermercado" value={address.referencePoint} onChange={e => setAddress({...address, referencePoint: e.target.value})} />
-                 </div>
-                  
-                  <div className="form-group" style={{ marginTop: '16px' }}>
-                    <button type="button" className="secondary-button" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }} onClick={handleGetLocation}>
-                      <MapPin size={18} /> Usar minha localização atual
-                    </button>
-                    {locationStatus && (
-                      <div style={{ marginTop: '8px', fontSize: '13px', color: locationStatus.includes('sucesso') ? '#22c55e' : 'var(--primary)' }}>
-                        {locationStatus}
-                      </div>
-                    )}
-                    {latitude && longitude && (
-                      <div className="map-preview" style={{ marginTop: '12px', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
-                        <iframe 
-                          width="100%" 
-                          height="200" 
-                          frameBorder="0" 
-                          scrolling="no" 
-                          marginHeight={0} 
-                          marginWidth={0} 
-                          src={`https://maps.google.com/maps?q=${latitude},${longitude}&hl=pt-BR&z=15&output=embed`}
-                        ></iframe>
-                      </div>
-                    )}
-                  </div>
-                </section>
+               {showAddressForm && (
+                 <AddressForm
+                   tenantSlug={tenantSlug}
+                   addressId={editingAddress?.id}
+                   initialAddress={editingAddress}
+                   onCancel={() => {
+                     setEditingAddress(null);
+                     if (addresses.length === 0) {
+                       // Cliente ainda não tem nenhum endereço salvo — não há pra onde "cancelar"
+                       // dentro do step 2, então volta pro carrinho.
+                       setStep(1);
+                     } else {
+                       setShowAddressForm(false);
+                     }
+                   }}
+                   onSaved={(savedAddr) => {
+                     setAddresses((prev) => [savedAddr, ...prev.filter((a) => a.id !== savedAddr.id)]);
+                     setSelectedAddressId(savedAddr.id);
+                     setShowAddressForm(false);
+                     setEditingAddress(null);
+                   }}
+                 />
+               )}
               </div>
           )}
 
@@ -712,7 +596,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                Informar Endereço <ChevronRight size={20} />
              </button>
           )}
-          {step === 2 && (
+          {step === 2 && !showAddressForm && (
              <div style={{display: 'flex', gap: '12px', width: '100%'}}>
                <button className="secondary-button" onClick={() => setStep(1)}>
                  <ChevronLeft size={20} /> Voltar
@@ -727,14 +611,14 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                <button className="secondary-button" onClick={() => setStep(2)}>
                  <ChevronLeft size={20} /> Voltar
                </button>
-                <button 
-                  className="primary-button" 
-                  style={{flex: 1, opacity: (!canFinishOrder) ? 0.5 : 1, cursor: (!canFinishOrder) ? 'not-allowed' : 'pointer'}} 
+                <button
+                  className="primary-button"
+                  style={{flex: 1, opacity: (!canFinishOrder || submittingOrder) ? 0.5 : 1, cursor: (!canFinishOrder || submittingOrder) ? 'not-allowed' : 'pointer'}}
                   onClick={handleFinishOrder}
-                  disabled={!canFinishOrder}
+                  disabled={!canFinishOrder || submittingOrder}
                   title={isStoreClosed ? "A loja está fechada" : doesNotMeetMinimum ? `Pedido mínimo é R$ ${formatCurrency(storeSettings?.minimumOrderAmount)}` : paymentTypeId === '' ? "Selecione uma forma de pagamento" : ""}
                 >
-                  <CheckCircle size={20} /> Finalizar Pedido
+                  <CheckCircle size={20} /> {submittingOrder ? 'Enviando pedido...' : 'Finalizar Pedido'}
                 </button>
              </div>
           )}

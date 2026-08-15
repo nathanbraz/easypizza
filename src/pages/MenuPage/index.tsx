@@ -6,7 +6,7 @@ import ProductModal from '../../components/ProductModal';
 import CheckoutModal from '../../components/CheckoutModal';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useEffect } from 'react';
-import { api, getTenantSlugFromUrl } from '../../lib/api';
+import { api, getTenantSlugFromUrl, CUSTOMER_SESSION_TOKEN_KEY } from '../../lib/api';
 // Fallback para tipagem ou quando a API falhar:
 import { fakeProducts, fakeDrinks } from './fakeData';
 import type { Product, ProductCategory } from '../../types';
@@ -38,14 +38,14 @@ export default function MenuPage() {
 
   useEffect(() => {
     const fetchSession = async () => {
-      const tokenToUse = sessionToken || localStorage.getItem('@EasyPizza:Token');
+      const tokenToUse = sessionToken || localStorage.getItem(CUSTOMER_SESSION_TOKEN_KEY);
       if (tokenToUse) {
         try {
           const res = await api.get(`/sessions/${tokenToUse}/customer-info`);
           const data = res.data.data || res.data;
           if (data && (data.sessionId || data.customerName)) {
             setCustomerInfo(data);
-            localStorage.setItem('@EasyPizza:Token', tokenToUse);
+            localStorage.setItem(CUSTOMER_SESSION_TOKEN_KEY, tokenToUse);
             localStorage.setItem('@EasyPizza:CustomerInfo', JSON.stringify(data));
             if (data.customerId) {
               localStorage.setItem('@EasyPizza:CustomerId', data.customerId);
@@ -60,7 +60,7 @@ export default function MenuPage() {
       }
 
       // Se não tiver token ou for inválido/expirado, limpa tudo
-      localStorage.removeItem('@EasyPizza:Token');
+      localStorage.removeItem(CUSTOMER_SESSION_TOKEN_KEY);
       localStorage.removeItem('@EasyPizza:CustomerInfo');
       localStorage.removeItem('@EasyPizza:CustomerId');
       setCustomerInfo(null);
@@ -69,6 +69,19 @@ export default function MenuPage() {
     };
     fetchSession();
   }, [sessionToken]);
+
+  // Sessão pode ser invalidada em runtime (ex: expirou, ou já foi usada para concluir um pedido).
+  // O interceptor do axios já limpa o token; aqui só refletimos isso na tela de "sessão expirada".
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      localStorage.removeItem('@EasyPizza:CustomerInfo');
+      localStorage.removeItem('@EasyPizza:CustomerId');
+      setCustomerInfo(null);
+      setSessionValid(false);
+    };
+    window.addEventListener('customer-session-expired', handleSessionExpired);
+    return () => window.removeEventListener('customer-session-expired', handleSessionExpired);
+  }, []);
 
   useEffect(() => {
     const fetchCatalog = async () => {
@@ -209,6 +222,12 @@ export default function MenuPage() {
               <button className="my-orders-btn" onClick={() => navigate('/tracker')}>
                 <ListOrdered size={16} />
                 Meus Pedidos
+              </button>
+            )}
+            {customerInfo && (
+              <button className="my-orders-btn" onClick={() => navigate('/addresses')}>
+                <MapPin size={16} />
+                Meus Endereços
               </button>
             )}
             <div className="status-badge" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? 'rgba(239, 68, 68, 0.1)' : undefined, color: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}>

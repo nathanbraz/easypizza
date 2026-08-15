@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useState, useEffect } from 'react';
 import MenuPage from './pages/MenuPage';
 import OrderTrackerPage from './pages/OrderTrackerPage';
+import AddressesPage from './pages/AddressesPage';
 
 import AdminLayout from './pages/Admin/Layout/AdminLayout';
 import OrdersDashboard from './pages/Admin/Orders';
@@ -143,6 +144,7 @@ function App() {
           
           <Route path="/tracker" element={<OrderTrackerPage />} />
           <Route path="/tracker/:orderId" element={<OrderTrackerPage />} />
+          <Route path="/addresses" element={<AddressesPage />} />
           
           {/* Rotas Privadas das Pizzarias */}
           <Route element={<ProtectedRoute />}>

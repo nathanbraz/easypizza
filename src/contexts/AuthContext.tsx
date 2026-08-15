@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { api } from '../lib/api';
+import { api, STAFF_TOKEN_KEY } from '../lib/api';
 
 export interface UserInfo {
   id: string;
@@ -42,7 +42,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(() => {
     const storedUser = localStorage.getItem('@EasyPizza:User');
-    const storedToken = localStorage.getItem('@EasyPizza:Token');
+    const storedToken = localStorage.getItem(STAFF_TOKEN_KEY);
     if (storedUser && storedToken) {
       try {
         const parsed = JSON.parse(storedUser);
@@ -77,13 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const permissions = decodePermissionsFromToken(token);
     const userWithPermissions = { ...userInfo, permissions };
 
-    localStorage.setItem('@EasyPizza:Token', token);
+    localStorage.setItem(STAFF_TOKEN_KEY, token);
     localStorage.setItem('@EasyPizza:User', JSON.stringify(userWithPermissions));
     setUser(userWithPermissions);
   };
 
   const logout = async () => {
-    const token = localStorage.getItem('@EasyPizza:Token');
+    const token = localStorage.getItem(STAFF_TOKEN_KEY);
     if (token) {
       try {
         await api.post('/auth/logout');
@@ -91,8 +91,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn("Sessão no backend já expirou ou servidor indisponível.", err);
       }
     }
-    
-    localStorage.removeItem('@EasyPizza:Token');
+
+    localStorage.removeItem(STAFF_TOKEN_KEY);
     localStorage.removeItem('@EasyPizza:User');
     setUser(null);
   };

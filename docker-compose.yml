@@ -1,0 +1,19 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: easypizza_frontend
+    ports:
+      - "3333:3333"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      # API do backend (repo easypizzab, stack Docker independente). Em dev os dois rodam no
+      # mesmo host, então localhost:5000 (porta publicada pelo compose do backend) funciona direto.
+      - VITE_API_URL=http://localhost:5000/api
+    restart: unless-stopped
