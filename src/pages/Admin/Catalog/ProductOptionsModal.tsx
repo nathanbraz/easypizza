@@ -14,6 +14,11 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Opções compartilhadas da categoria (Tamanho, Borda) — só liga/desliga e define preço aqui.
+  // A definição do grupo/opção em si é feita em "Opções da Categoria" (aba Categorias).
+  const [sharedGroups, setSharedGroups] = useState<any[]>([]);
+  const [loadingShared, setLoadingShared] = useState(true);
+
   // Group Form State
   const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<any>(null);
@@ -39,17 +44,68 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
   useEffect(() => {
     loadOptions();
+    loadSharedOptions();
   }, [product.id]);
 
-  const loadOptions = async () => {
+  // `silent`: recarrega os dados sem trocar a seção inteira por um spinner. Usado depois de
+  // qualquer edição (toggle, preço, criar/editar/excluir) — sem isso, o conteúdo encolhia por um
+  // instante a cada alteração e a rolagem do modal voltava pro topo. O spinner (não-silencioso)
+  // fica só pro carregamento inicial, quando ainda não há nada pra mostrar.
+  const loadOptions = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const res = await api.get(`/productoptions/${tenantSlug}/product/${product.id}`);
       setGroups(res.data);
     } catch (error) {
       console.error('Error loading product options:', error);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const loadSharedOptions = async (silent = false) => {
+    if (!product.categoryId) {
+      setSharedGroups([]);
+      setLoadingShared(false);
+      return;
+    }
+    try {
+      if (!silent) setLoadingShared(true);
+      const res = await api.get(`/categoryoptions/${tenantSlug}/category/${product.categoryId}/product/${product.id}`);
+      setSharedGroups(res.data);
+    } catch (error) {
+      console.error('Error loading shared category options:', error);
+    } finally {
+      if (!silent) setLoadingShared(false);
+    }
+  };
+
+  const toggleSharedItem = async (item: any, offered: boolean) => {
+    try {
+      if (offered) {
+        // O backend guarda o preço mesmo com a opção desativada (não apaga a linha), então
+        // `item.additionalPrice` já vem certo aqui — não precisa lembrar nada no cliente.
+        await api.put(`/categoryoptions/${tenantSlug}/product/${product.id}/item/${item.id}`, { additionalPrice: item.additionalPrice ?? 0 });
+      } else {
+        await api.delete(`/categoryoptions/${tenantSlug}/product/${product.id}/item/${item.id}`);
+      }
+      loadSharedOptions(true);
+    } catch (error) {
+      alert('Erro ao atualizar opção.');
+    }
+  };
+
+  const saveSharedItemPrice = async (item: any, priceText: string) => {
+    const price = parseFloat(priceText.replace(',', '.'));
+    if (isNaN(price) || price < 0) {
+      loadSharedOptions(true); // reverte o input pro valor salvo
+      return;
+    }
+    try {
+      await api.put(`/categoryoptions/${tenantSlug}/product/${product.id}/item/${item.id}`, { additionalPrice: price });
+      loadSharedOptions(true);
+    } catch (error) {
+      alert('Erro ao atualizar preço.');
     }
   };
 
@@ -78,7 +134,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
         await api.post(`/productoptions/${tenantSlug}/product/${product.id}`, payload);
       }
       setIsGroupFormOpen(false);
-      loadOptions();
+      loadOptions(true);
     } catch (error) {
       alert('Erro ao salvar grupo.');
     }
@@ -88,7 +144,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
     if (!window.confirm('Excluir este grupo e todas as suas opções?')) return;
     try {
       await api.delete(`/productoptions/${tenantSlug}/group/${id}`);
-      loadOptions();
+      loadOptions(true);
     } catch (error) {
       alert('Erro ao excluir grupo.');
     }
@@ -128,7 +184,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
         await api.post(`/productoptions/${tenantSlug}/group/${activeGroupId}/items`, payload);
       }
       setIsItemFormOpen(false);
-      loadOptions();
+      loadOptions(true);
     } catch (error) {
       alert('Erro ao salvar opção.');
     }
@@ -138,7 +194,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
     if (!window.confirm('Excluir esta opção?')) return;
     try {
       await api.delete(`/productoptions/${tenantSlug}/item/${id}`);
-      loadOptions();
+      loadOptions(true);
     } catch (error) {
       alert('Erro ao excluir opção.');
     }
@@ -170,9 +226,11 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
 
     try {
       setIsCopying(true);
-      // 1. Get options from source product
+      // 1. Get options from source product — só as próprias (Adicionais extras etc.). Tamanho/Borda
+      // são compartilhados da categoria e não fazem sentido "copiar": basta ligar/definir preço
+      // direto na seção de opções da categoria deste produto.
       const res = await api.get(`/productoptions/${tenantSlug}/product/${selectedProductIdToCopy}`);
-      const sourceGroups = res.data;
+      const sourceGroups = res.data.filter((g: any) => !g.isShared);
 
       // 2. Clone them to the current product
       for (const group of sourceGroups) {
@@ -198,7 +256,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
       }
 
       setIsCopyModalOpen(false);
-      loadOptions();
+      loadOptions(true);
     } catch (error) {
       console.error(error);
       alert('Erro ao copiar opções.');
@@ -206,6 +264,10 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
       setIsCopying(false);
     }
   };
+
+  // "Opções do Produto" mostra só os grupos próprios (Adicionais extras). Tamanho/Borda vêm do
+  // endpoint mesclado com isShared=true e são geridos na seção "Opções da Categoria" abaixo.
+  const ownGroups = groups.filter(g => !g.isShared);
 
   return createPortal(
     <div className="modal-overlay" style={{ zIndex: 1100 }}>
@@ -215,7 +277,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
           <div style={{ paddingRight: '40px' }}>
             <h2 style={{ margin: 0 }}>Opções: {product.name}</h2>
             <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
-              Crie tamanhos, pontos de carne, adicionais específicos para este produto.
+              Crie adicionais específicos deste produto e defina o preço do Tamanho/Borda da categoria.
             </p>
           </div>
         </div>
@@ -241,13 +303,13 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                 </div>
               </div>
 
-              {groups.length === 0 && (
+              {ownGroups.length === 0 && (
                 <div style={{ textAlign: 'center', padding: '40px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
                   <p style={{ color: 'var(--text-muted)' }}>Este produto não possui opções personalizadas.</p>
                 </div>
               )}
 
-              {groups.map(g => (
+              {ownGroups.map(g => (
                 <div key={g.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
                   <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <div>
@@ -296,6 +358,93 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                   </div>
                 </div>
               ))}
+
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '24px', marginTop: '8px' }}>
+                <h3 style={{ margin: 0 }}>Tamanho e Borda (opções da categoria)</h3>
+                <p style={{ margin: '4px 0 16px', fontSize: '13px', color: 'var(--text-muted)' }}>
+                  Definidos uma vez para toda a categoria. Aqui você só liga o que este produto oferece e define o preço dele.
+                  Para criar/editar/excluir uma opção em si, use "Gerenciar Opções" na aba Categorias.
+                </p>
+
+                {loadingShared ? (
+                  <div style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
+                    <div className="global-spinner" />
+                  </div>
+                ) : sharedGroups.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', border: '1px dashed rgba(255,255,255,0.1)' }}>
+                    <p style={{ margin: 0, color: 'var(--text-muted)' }}>
+                      {product.categoryId ? 'A categoria deste produto ainda não tem Tamanho, Borda ou outro grupo compartilhado.' : 'Este produto não tem categoria definida.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {sharedGroups.map((g: any) => (
+                      <div key={g.id} style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px', overflow: 'hidden' }}>
+                        <div style={{ padding: '16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                          <h4 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {g.name}
+                            {g.hasUniformPricing && (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--primary)', background: 'rgba(249, 115, 22, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>
+                                Preço uniforme
+                              </span>
+                            )}
+                          </h4>
+                        </div>
+                        <div style={{ padding: '16px' }}>
+                          <table className="admin-table" style={{ margin: 0 }}>
+                            <thead>
+                              <tr>
+                                <th style={{ width: '60px' }}>Oferece?</th>
+                                <th>Opção</th>
+                                <th style={{ width: '160px' }}>Preço Adicional</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {g.items.map((item: any) => (
+                                <tr key={item.id}>
+                                  <td>
+                                    <label className="toggle-switch">
+                                      <input
+                                        type="checkbox"
+                                        checked={item.isOffered}
+                                        onChange={(e) => toggleSharedItem(item, e.target.checked)}
+                                      />
+                                      <span className="slider"></span>
+                                    </label>
+                                  </td>
+                                  <td>{item.name}</td>
+                                  <td>
+                                    {g.hasUniformPricing ? (
+                                      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                        R$ {formatCurrency(item.additionalPrice ?? 0)} <span style={{ fontSize: '11px' }}>(definido na categoria)</span>
+                                      </span>
+                                    ) : (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>R$</span>
+                                        <input
+                                          key={`${item.id}-${item.additionalPrice}`}
+                                          type="number"
+                                          step="0.01"
+                                          min="0"
+                                          className="form-input"
+                                          style={{ padding: '6px 8px' }}
+                                          defaultValue={item.additionalPrice ?? 0}
+                                          disabled={!item.isOffered}
+                                          onBlur={(e) => saveSharedItemPrice(item, e.target.value)}
+                                        />
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -425,7 +574,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
             <button className="modal-close" style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsCopyModalOpen(false)}><X size={20} /></button>
             <h3 style={{ marginTop: 0, paddingRight: '24px' }}>Copiar Opções de Outro Produto</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginBottom: '16px' }}>
-              Selecione de qual produto você deseja copiar os Tamanhos e Adicionais. Isso substituirá as opções atuais caso existam (ou as adicionará).
+              Selecione de qual produto você deseja copiar os Adicionais próprios (Tamanho/Borda já são compartilhados pela categoria, não precisam ser copiados). Isso adicionará as opções copiadas às atuais.
             </p>
             <form onSubmit={handleCopyOptions} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="form-group">

@@ -268,15 +268,10 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                    let description = item.baseProduct.description;
                    
                    if (isHalf) {
-                     let halfDesc = halfOption.description;
-                     if (!halfDesc) {
-                       const originalName = halfOption.name.replace('1/2 ', '').replace('Meia ', '');
-                       const foundProduct = availableProducts.find(p => p.name === originalName);
-                       if (foundProduct) halfDesc = foundProduct.description;
-                     }
-
+                     // A descrição da 2ª metade já vem pronta do ProductModal (finalSelectedOptions) —
+                     // sem precisar casar por nome do produto aqui.
                      title = `Meia ${item.baseProduct.name} & ${halfOption.name.replace('1/2 ', 'Meia ')}`;
-                     description = `Metade 1: ${item.baseProduct.description || 'Sem descrição'}\nMetade 2: ${halfDesc || 'Sem descrição'}`;
+                     description = `Metade 1: ${item.baseProduct.description || 'Sem descrição'}\nMetade 2: ${halfOption.description || 'Sem descrição'}`;
                    }
 
                    const img = item.baseProduct.imageUrl || (item.baseProduct.imageUrls && item.baseProduct.imageUrls.length > 0 ? item.baseProduct.imageUrls[0] : null);

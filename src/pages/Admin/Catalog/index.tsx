@@ -7,8 +7,9 @@ import Cropper from 'react-easy-crop';
 import 'react-easy-crop/react-easy-crop.css';
 import getCroppedImg from '../../../utils/cropImage';
 import ProductOptionsModal from './ProductOptionsModal';
+import CategoryOptionsModal from './CategoryOptionsModal';
 import './Catalog.css';
-import { formatCurrency } from '../../../utils/formatCurrency';
+import { getDisplayPrice } from '../../../utils/getDisplayPrice';
 
 export default function CatalogManager() {
   const [activeTab, setActiveTab] = useState('produtos');
@@ -21,6 +22,10 @@ export default function CatalogManager() {
   // Opções Modal
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [selectedProductForOptions, setSelectedProductForOptions] = useState<any>(null);
+
+  // Opções da Categoria (Tamanho, Borda)
+  const [isCategoryOptionsModalOpen, setIsCategoryOptionsModalOpen] = useState(false);
+  const [selectedCategoryForOptions, setSelectedCategoryForOptions] = useState<any>(null);
   
   const [loadingForm, setLoadingForm] = useState(false);
   const [formError, setFormError] = useState<string>('');
@@ -133,6 +138,11 @@ export default function CatalogManager() {
     setIsOptionsModalOpen(true);
   };
 
+  const openCategoryOptionsModal = (category: any) => {
+    setSelectedCategoryForOptions(category);
+    setIsCategoryOptionsModalOpen(true);
+  };
+
   const handleDelete = async (id: string, type: string) => {
     if (!window.confirm('Tem certeza que deseja excluir?')) return;
     try {
@@ -226,6 +236,11 @@ export default function CatalogManager() {
     }
   };
 
+  // Só existe pra um produto já existente, que já traz as opções mescladas (Tamanho, Borda etc.)
+  // vindas de GET /products/{tenantSlug}. Um produto novo ainda não tem isso — a categoria só
+  // define suas opções compartilhadas depois, em "Gerenciar Opções".
+  const hasSharedRequiredGroup = editingItem?.optionGroups?.some((g: any) => g.isShared && g.isRequired) ?? false;
+
   return (
     <div className="catalog-manager animate-fade-in">
       <header className="catalog-header">
@@ -249,7 +264,7 @@ export default function CatalogManager() {
                 <tr>
                   <th>Produto</th>
                   <th>Categoria</th>
-                  <th>Preço Base</th>
+                  <th>Preço</th>
                   <th>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', paddingRight: '0.5rem' }}>Ações</div>
                   </th>
@@ -266,7 +281,7 @@ export default function CatalogManager() {
                         </div>
                       </td>
                       <td>{cat?.name || 'Sem categoria'}</td>
-                      <td>R$ {formatCurrency(p.price)}</td>
+                      <td>{getDisplayPrice(p)}</td>
                       <td>
                         <div style={{ display: 'flex', gap: '8px' }}>
                           <button className="btn-icon" title="Gerenciar Opções/Tamanhos" onClick={() => openOptionsModal(p)}><Plus size={16} /></button>
@@ -301,8 +316,9 @@ export default function CatalogManager() {
                     <td>{c.displayOrder}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button className="btn-icon" onClick={() => openModal(c)}><Edit2 size={16} /></button>
-                        <button className="btn-icon" style={{ color: '#ef4444' }} onClick={() => handleDelete(c.id, 'categoria')}><Trash2 size={16} /></button>
+                        <button className="btn-icon" title="Gerenciar Opções (Tamanho, Borda)" onClick={() => openCategoryOptionsModal(c)}><Plus size={16} /></button>
+                        <button className="btn-icon" title="Editar Categoria" onClick={() => openModal(c)}><Edit2 size={16} /></button>
+                        <button className="btn-icon" title="Excluir Categoria" style={{ color: '#ef4444' }} onClick={() => handleDelete(c.id, 'categoria')}><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
@@ -463,9 +479,20 @@ export default function CatalogManager() {
                         />
                       </div>
                       {errors.price && <span className="form-msg-error">{errors.price}</span>}
-                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
-                        💡 Use R$ 0,00 se o preço real vier das opções (ex: Tamanho P/M/G).
-                      </span>
+                      {hasSharedRequiredGroup ? (
+                        <div style={{ marginTop: '4px', fontSize: '11px', color: 'var(--text-muted)' }}>
+                          <span style={{ display: 'block' }}>
+                            💡 Esta categoria já cobra pelo Tamanho — deixe R$ 0,00, a menos que queira somar um valor fixo só neste produto.
+                          </span>
+                          <span style={{ display: 'block', marginTop: '4px', color: 'var(--primary)', fontWeight: 600 }}>
+                            Prévia no cardápio: {getDisplayPrice({ price: parseFloat(itemPrice.replace(',', '.')) || 0, optionGroups: editingItem.optionGroups })}
+                          </span>
+                        </div>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                          💡 Use R$ 0,00 se o preço real vier das opções (ex: Tamanho P/M/G).
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -595,12 +622,23 @@ export default function CatalogManager() {
       )}
 
       {isOptionsModalOpen && selectedProductForOptions && (
-        <ProductOptionsModal 
+        <ProductOptionsModal
           product={selectedProductForOptions}
           tenantSlug={tenantSlug}
           onClose={() => {
             setIsOptionsModalOpen(false);
             setSelectedProductForOptions(null);
+          }}
+        />
+      )}
+
+      {isCategoryOptionsModalOpen && selectedCategoryForOptions && (
+        <CategoryOptionsModal
+          category={selectedCategoryForOptions}
+          tenantSlug={tenantSlug}
+          onClose={() => {
+            setIsCategoryOptionsModalOpen(false);
+            setSelectedCategoryForOptions(null);
           }}
         />
       )}

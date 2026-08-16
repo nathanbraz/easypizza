@@ -1,7 +1,7 @@
 import { Plus } from 'lucide-react';
 import type { Product } from '../../types';
 import './ProductCard.css';
-import { formatCurrency } from '../../utils/formatCurrency';
+import { getDisplayPrice } from '../../utils/getDisplayPrice';
 
 interface ProductCardProps {
   product: Product;
@@ -21,36 +21,6 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
 
   const finalImage = imgUrl || getFallbackImage();
 
-  const getDisplayPrice = () => {
-    if (product.price > 0) {
-      return `R$ ${formatCurrency(product.price)}`;
-    }
-
-    let minAdditionalPrice = 0;
-    let hasMandatoryOptions = false;
-
-    if (product.optionGroups && product.optionGroups.length > 0) {
-      product.optionGroups.forEach((group: any) => {
-        if (group.minChoices > 0 && group.options && group.options.length > 0) {
-          hasMandatoryOptions = true;
-          // Encontra a opção mais barata deste grupo obrigatório
-          const cheapestOption = Math.min(...group.options.map((o: any) => o.additionalPrice));
-          minAdditionalPrice += (cheapestOption * group.minChoices);
-        }
-      });
-    }
-
-    if (hasMandatoryOptions && minAdditionalPrice > 0) {
-      return `A partir de R$ ${formatCurrency(minAdditionalPrice)}`;
-    }
-
-    if (product.optionGroups && product.optionGroups.length > 0) {
-      return 'Ver opções';
-    }
-
-    return 'Grátis';
-  };
-
   return (
     <div 
       className="product-card animate-fade-in"
@@ -58,7 +28,7 @@ export default function ProductCard({ product, onAdd, delay }: ProductCardProps)
     >
       <div className="product-image-container">
         <img src={finalImage} alt={product.name} />
-        <div className="price-tag">{getDisplayPrice()}</div>
+        <div className="price-tag">{getDisplayPrice(product)}</div>
       </div>
       
       <div className="product-info">

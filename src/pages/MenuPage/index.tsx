@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, MessageCircle, ListOrdered, Zap, RotateCcw } from 'lucide-react';
+import { MapPin, MessageCircle, ListOrdered, Zap, RotateCcw, Search, X, Home } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import Cart from '../../components/Cart';
 import ProductModal from '../../components/ProductModal';
@@ -24,6 +24,8 @@ export default function MenuPage() {
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -123,6 +125,12 @@ export default function MenuPage() {
     setSelectedProduct(product);
   };
 
+  // Filtra por nome do produto em todas as categorias — sem rota nova, só esconde o que não bate.
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleCategories = normalizedQuery
+    ? categories.map(c => ({ ...c, products: (c.products || []).filter(p => p.name.toLowerCase().includes(normalizedQuery)) }))
+    : categories;
+
   const handleAddToCart = (customizedItem: any) => {
     setCart([...cart, customizedItem]);
   };
@@ -218,18 +226,6 @@ export default function MenuPage() {
         <div className="header-info">
           <h1>{customerInfo ? `Olá, ${customerInfo.customerName}!` : 'EasyPizza'}</h1>
           <div className="header-actions">
-            {customerInfo && (
-              <button className="my-orders-btn" onClick={() => navigate('/tracker')}>
-                <ListOrdered size={16} />
-                Meus Pedidos
-              </button>
-            )}
-            {customerInfo && (
-              <button className="my-orders-btn" onClick={() => navigate('/addresses')}>
-                <MapPin size={16} />
-                Meus Endereços
-              </button>
-            )}
             <div className="status-badge" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? 'rgba(239, 68, 68, 0.1)' : undefined, color: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}>
               <span className="dot" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}></span>
               {storeSettings?.isStoreOpen === false ? 'Fechado no momento' : 'Aberto agora'}
@@ -263,12 +259,27 @@ export default function MenuPage() {
           </div>
         )}
 
-        {categories.filter(c => c.products && c.products.length > 0).length === 0 && !loading ? (
+        <div className="search-bar">
+          <Search size={16} color="var(--text-muted)" />
+          <input
+            type="text"
+            placeholder="Buscar produto no cardápio..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} aria-label="Limpar busca">
+              <X size={16} />
+            </button>
+          )}
+        </div>
+
+        {visibleCategories.filter(c => c.products && c.products.length > 0).length === 0 && !loading ? (
           <div className="empty-state">
-            <p>Nenhum produto encontrado.</p>
+            <p>{normalizedQuery ? `Nenhum produto encontrado para "${searchQuery}".` : 'Nenhum produto encontrado.'}</p>
           </div>
         ) : (
-          categories.filter(category => category.products && category.products.length > 0).map((category: ProductCategory) => (
+          visibleCategories.filter(category => category.products && category.products.length > 0).map((category: ProductCategory) => (
             <div key={category.id || category.name}>
               <h2 className="section-title">{category.name}</h2>
               <div className="product-grid">
@@ -285,6 +296,25 @@ export default function MenuPage() {
           ))
         )}
       </main>
+
+      <nav className="bottom-nav">
+        <button className="bottom-nav-item active">
+          <Home size={20} />
+          <span>Início</span>
+        </button>
+        {customerInfo && (
+          <button className="bottom-nav-item" onClick={() => navigate('/tracker')}>
+            <ListOrdered size={20} />
+            <span>Pedidos</span>
+          </button>
+        )}
+        {customerInfo && (
+          <button className="bottom-nav-item" onClick={() => navigate('/addresses')}>
+            <MapPin size={20} />
+            <span>Endereços</span>
+          </button>
+        )}
+      </nav>
 
       {!isCheckoutOpen && !selectedProduct && cart.length > 0 && <Cart items={cart} onCheckout={() => setIsCheckoutOpen(true)} />}
 

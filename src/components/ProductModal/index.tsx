@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { X, Plus, Minus, Search, CheckCircle2 } from 'lucide-react';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
-import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './ProductModal.css';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -15,12 +14,23 @@ interface ProductModalProps {
 }
 
 export default function ProductModal({ product, availableProducts, onClose, onAddToCart }: ProductModalProps) {
-  const tenantSlug = getTenantSlugFromUrl();
-  const [optionGroups, setOptionGroups] = useState<any[]>([]);
-  const [loadingOptions, setLoadingOptions] = useState(true);
-  
+  // As opções do produto já vêm prontas em `product.optionGroups` — o mesmo GET /menu/{tenantSlug}
+  // que carregou o cardápio já mescla os grupos próprios (Adicionais extras) com os compartilhados
+  // da categoria (Tamanho, Borda), com o preço correto para ESTE produto. Não precisa de fetch aqui.
+  const optionGroups: any[] = product.optionGroups || [];
+
+  // Tamanho/Borda (isShared) são propriedades da pizza inteira, únicas por categoria — usamos o
+  // MESMO id em qualquer produto da categoria, então dá pra comparar/combinar entre sabores por id,
+  // sem depender de casar nomes de texto (era isso que causava o bug do meio a meio antigo).
+  const sharedGroups = optionGroups.filter((g: any) => g.isShared);
+  const ownGroups = optionGroups.filter((g: any) => !g.isShared);
+
   // State for radio/checkbox selections (key: groupId, value: array of itemIds)
-  const [selections, setSelections] = useState<Record<string, string[]>>({});
+  const [selections, setSelections] = useState<Record<string, string[]>>(() => {
+    const initial: Record<string, string[]> = {};
+    optionGroups.forEach((g: any) => { initial[g.id] = []; });
+    return initial;
+  });
   // State for counter quantities (key: itemId, value: quantity number)
   const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({});
 
@@ -32,8 +42,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   // Half and Half (Meio a Meio)
   const [isHalfAndHalf, setIsHalfAndHalf] = useState(false);
   const [secondHalfProductId, setSecondHalfProductId] = useState<string>('');
-  const [secondHalfOptions, setSecondHalfOptions] = useState<any[]>([]);
-  const [loadingSecondHalf, setLoadingSecondHalf] = useState(false);
   const [searchHalf, setSearchHalf] = useState('');
 
   // Drag to scroll
@@ -65,53 +73,10 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
 
   useLockBodyScroll();
 
-  useEffect(() => {
-    const fetchOptions = async () => {
-      try {
-        setLoadingOptions(true);
-        const res = await api.get(`/productoptions/${tenantSlug}/product/${product.id}`);
-        const groups = res.data;
-        setOptionGroups(groups);
-        
-        // Start all groups without auto-selection
-        const initialSelections: Record<string, string[]> = {};
-        groups.forEach((g: any) => {
-          initialSelections[g.id] = [];
-        });
-        setSelections(initialSelections);
-        
-      } catch (error) {
-        console.error('Error fetching product options', error);
-      } finally {
-        setLoadingOptions(false);
-      }
-    };
-    fetchOptions();
-  }, [product.id, tenantSlug]);
-
-  useEffect(() => {
-    if (!isHalfAndHalf || !secondHalfProductId) {
-      setSecondHalfOptions([]);
-      return;
-    }
-    const fetchSecondHalfOptions = async () => {
-      try {
-        setLoadingSecondHalf(true);
-        const res = await api.get(`/productoptions/${tenantSlug}/product/${secondHalfProductId}`);
-        setSecondHalfOptions(res.data);
-      } catch (error) {
-        console.error('Error fetching 2nd half options', error);
-      } finally {
-        setLoadingSecondHalf(false);
-      }
-    };
-    fetchSecondHalfOptions();
-  }, [secondHalfProductId, isHalfAndHalf, tenantSlug]);
-
   const handleToggleOption = (groupId: string, itemId: string, maxChoices: number) => {
     setSelections(prev => {
       const currentSelection = prev[groupId] || [];
-      
+
       if (maxChoices === 1) {
         // Radio button behavior
         return { ...prev, [groupId]: [itemId] };
@@ -150,11 +115,11 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
 
   // Pricing Logic
   const basePrice = product.price;
-    
+
   // Calculate total additional price from selected options (radio/checkbox)
   let optionsTotal = 0;
   const selectedOptionObjects: any[] = [];
-  
+
   optionGroups.forEach((g: any) => {
     if (g.groupType === 'counter') {
       // Counter groups: sum quantities
@@ -177,33 +142,46 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       });
     }
   });
-  
+
+  // Um 2º sabor só pode ser combinado se oferecer TODAS as opções compartilhadas (Tamanho, Borda)
+  // já escolhidas no 1º sabor — evita "meio Tamanho G, meio Tamanho não-existe" ou bordas
+  // divididas por metade, que o lojista não faz (ver conversa sobre isso).
+  const candidateOffersCurrentSharedSelection = (candidate: any) => {
+    const candidateGroups: any[] = candidate.optionGroups || [];
+    return sharedGroups.every((g: any) => {
+      const selectedIds = selections[g.id] || [];
+      if (selectedIds.length === 0) return true; // nada escolhido nesse grupo ainda, não restringe
+      const candidateGroup = candidateGroups.find((cg: any) => cg.id === g.id);
+      const candidateItemIds = new Set((candidateGroup?.options || []).map((o: any) => o.id));
+      return selectedIds.every((id: string) => candidateItemIds.has(id));
+    });
+  };
+
   // Half and Half logic
   let halfAndHalfExtraPrice = 0;
-  let secondHalfProductObj = null;
+  let secondHalfProductObj: any = null;
+  let secondHalfOptionGroups: any[] = [];
 
-  if (isHalfAndHalf && secondHalfProductId && secondHalfOptions.length > 0) {
-    secondHalfProductObj = availableProducts.find(p => p.id === secondHalfProductId);
+  if (isHalfAndHalf && secondHalfProductId) {
+    secondHalfProductObj = availableProducts.find(p => p.id === secondHalfProductId) || null;
     if (secondHalfProductObj) {
-      // Find matching size/options that the user selected in the MAIN product
-      selectedOptionObjects.forEach(mainOpt => {
-        const group = optionGroups.find(g => g.name === mainOpt.groupName);
-        // Only consider single choice groups like Size, Crust for pricing diff
-        if (group && group.maxChoices === 1) {
-          const matchingGroup2 = secondHalfOptions.find(g => g.name === group.name);
-          if (matchingGroup2) {
-            const matchingOpt2 = matchingGroup2.options.find((o: any) => o.name === mainOpt.name);
-            if (matchingOpt2) {
-              const diff = (matchingOpt2.additionalPrice || 0) - (mainOpt.additionalPrice || 0);
-              // Charge the most expensive half
-              if (diff > 0) {
-                halfAndHalfExtraPrice += diff;
-              }
-            }
+      secondHalfOptionGroups = secondHalfProductObj.optionGroups || [];
+
+      // Para cada opção compartilhada escolhida (Tamanho, Borda), compara o preço que CADA sabor
+      // cobra pelo MESMO item (mesmo id) e cobra a diferença do mais caro — sem casar por nome.
+      sharedGroups.forEach((g: any) => {
+        const selectedIds = selections[g.id] || [];
+        selectedIds.forEach((itemId: string) => {
+          const mainOpt = g.options.find((o: any) => o.id === itemId);
+          const secondGroup = secondHalfOptionGroups.find((sg: any) => sg.id === g.id);
+          const secondOpt = secondGroup?.options.find((o: any) => o.id === itemId);
+          if (mainOpt && secondOpt) {
+            const diff = (secondOpt.additionalPrice || 0) - (mainOpt.additionalPrice || 0);
+            if (diff > 0) halfAndHalfExtraPrice += diff;
           }
-        }
+        });
       });
-      
+
       const baseDiff = secondHalfProductObj.price - basePrice;
       if (baseDiff > 0) {
         halfAndHalfExtraPrice += baseDiff;
@@ -211,8 +189,18 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     }
   }
 
+  // Uma vez que o 2º sabor está escolhido, as opções compartilhadas exibidas pro cliente se
+  // restringem à interseção do que os dois sabores oferecem — pra não deixar montar uma combinação
+  // que só um dos dois sabores suporta.
+  const getSharedGroupDisplayOptions = (group: any) => {
+    if (!isHalfAndHalf || !secondHalfProductObj) return group.options;
+    const secondGroup = secondHalfOptionGroups.find((sg: any) => sg.id === group.id);
+    const secondIds = new Set((secondGroup?.options || []).map((o: any) => o.id));
+    return group.options.filter((o: any) => secondIds.has(o.id));
+  };
+
   const drinksTotal = selectedDrinks.reduce((sum, d) => sum + d.price, 0);
-  
+
   const unitTotal = basePrice + optionsTotal + halfAndHalfExtraPrice;
   const finalTotal = (unitTotal * quantity) + drinksTotal;
 
@@ -227,17 +215,19 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     return selectedCount >= g.minChoices;
   });
 
+  const sharedGroupsValid = sharedGroups.every((g: any) => (selections[g.id] || []).length >= g.minChoices);
+
   const handleConfirm = () => {
     if (!isValid) {
       alert("Por favor, preencha todos os itens obrigatórios.");
       return;
     }
-    
+
     if (isHalfAndHalf && secondHalfProductId && !secondHalfProductObj) {
-      alert("Aguarde o carregamento do 2º sabor ou selecione uma opção válida.");
+      alert("Selecione um sabor válido para a 2ª metade.");
       return;
     }
-    
+
     // Add the second half as a pseudo-option so it appears in the cart and backend
     const finalSelectedOptions = [...selectedOptionObjects];
     if (isHalfAndHalf && secondHalfProductObj) {
@@ -263,13 +253,112 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     onClose();
   };
 
+  const renderGroupOptions = (group: any) => {
+    const displayOptions = group.isShared ? getSharedGroupDisplayOptions(group) : group.options;
+
+    return (
+      <div className={group.groupType === 'counter' ? 'counter-group' : (group.maxChoices === 1 ? "radio-group" : "checkbox-group")}>
+        {displayOptions.map((opt: any) => {
+          const isSelected = (selections[group.id] || []).includes(opt.id);
+          const isMaxReached = (selections[group.id] || []).length >= group.maxChoices;
+          const disabled = !isSelected && isMaxReached && group.maxChoices > 1;
+
+          if (group.groupType === 'counter') {
+            const qty = counterQuantities[opt.id] || 0;
+            return (
+              <div key={opt.id} className="counter-item">
+                <div className="counter-item-info">
+                  <span className="name">{opt.name}</span>
+                  <span className="price">{opt.additionalPrice > 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : 'Grátis'}</span>
+                </div>
+                <div className="counter-controls">
+                  <button
+                    type="button"
+                    className="counter-btn"
+                    onClick={() => handleCounterChange(group.id, opt.id, -1, group.maxChoices)}
+                    disabled={qty === 0}
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <span className="counter-value">{qty}</span>
+                  <button
+                    type="button"
+                    className="counter-btn"
+                    onClick={() => handleCounterChange(group.id, opt.id, 1, group.maxChoices)}
+                  >
+                    <Plus size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          } else if (group.maxChoices === 1) {
+            return (
+              <label key={opt.id} className={`radio-card ${isSelected ? 'selected' : ''}`}>
+                <input
+                  type="radio"
+                  name={`group_${group.id}`}
+                  checked={isSelected}
+                  onChange={() => handleToggleOption(group.id, opt.id, group.maxChoices)}
+                />
+                <div className="radio-info">
+                  <span className="name">{opt.name}</span>
+                  <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : (opt.additionalPrice < 0 ? `- R$ ${formatCurrency(Math.abs(opt.additionalPrice))}` : (product.price === 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : ''))}</span>
+                </div>
+              </label>
+            );
+          } else {
+            return (
+              <label key={opt.id} className={`checkbox-item ${disabled ? 'disabled' : ''}`} style={{ opacity: disabled ? 0.5 : 1 }}>
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  disabled={disabled}
+                  onChange={() => handleToggleOption(group.id, opt.id, group.maxChoices)}
+                />
+                <span className="name">{opt.name}</span>
+                <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : ''}</span>
+              </label>
+            );
+          }
+        })}
+      </div>
+    );
+  };
+
+  const renderGroupSection = (group: any) => {
+    let selectedCount = 0;
+    if (group.groupType === 'counter') {
+      selectedCount = group.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
+    } else {
+      selectedCount = (selections[group.id] || []).length;
+    }
+    const isGroupValid = selectedCount >= group.minChoices;
+
+    return (
+      <section key={group.id} className="modal-section">
+        <div className="section-header">
+          <div>
+            <h3>{group.name}</h3>
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+              {group.minChoices > 0 ? `Escolha de ${group.minChoices} até ${group.maxChoices} opções` : `Escolha até ${group.maxChoices} opções`}
+            </p>
+          </div>
+          <span className="required-badge" style={{ backgroundColor: isGroupValid ? 'rgba(34, 197, 94, 0.1)' : '', color: isGroupValid ? '#22c55e' : '' }}>
+            {isGroupValid ? `✓ Concluído (${selectedCount}/${group.maxChoices})` : `${selectedCount}/${group.maxChoices}`}
+          </span>
+        </div>
+        {renderGroupOptions(group)}
+      </section>
+    );
+  };
+
   return (
     <div className="modal-overlay">
       <div className="modal-content animate-slide-up">
         <button className="modal-close" onClick={onClose}>
           <X size={24} />
         </button>
-        
+
         <div className="modal-header-image">
           <img src={product.imageUrl || (product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : (product.categoryName?.toLowerCase().includes('bebida') || product.name.toLowerCase().includes('cola') ? 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=60' : 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop&q=60'))} alt={product.name} />
         </div>
@@ -280,275 +369,191 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
             <p>{product.description}</p>
           </div>
 
-          {loadingOptions ? (
-            <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
-              <div className="global-spinner" />
-              Carregando opções...
-            </div>
-          ) : (
-            <>
-              {optionGroups.map((group) => {
-                let selectedCount = 0;
-                if (group.groupType === 'counter') {
-                  selectedCount = group.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
-                } else {
-                  selectedCount = (selections[group.id] || []).length;
-                }
-                const isGroupValid = selectedCount >= group.minChoices;
+          {/* 1. Opções compartilhadas da categoria primeiro (Tamanho, Borda) — são propriedades da
+              pizza inteira, então precisam estar definidas antes de montar um meio a meio. */}
+          {sharedGroups.map(renderGroupSection)}
 
-                return (
-                  <section key={group.id} className="modal-section">
-                    <div className="section-header">
-                      <div>
-                        <h3>{group.name}</h3>
-                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
-                          {group.minChoices > 0 ? `Escolha de ${group.minChoices} até ${group.maxChoices} opções` : `Escolha até ${group.maxChoices} opções`}
-                        </p>
-                      </div>
-                      <span className="required-badge" style={{ backgroundColor: isGroupValid ? 'rgba(34, 197, 94, 0.1)' : '', color: isGroupValid ? '#22c55e' : '' }}>
-                        {isGroupValid ? `✓ Concluído (${selectedCount}/${group.maxChoices})` : `${selectedCount}/${group.maxChoices}`}
-                      </span>
-                    </div>
-                    
-                    <div className={group.groupType === 'counter' ? 'counter-group' : (group.maxChoices === 1 ? "radio-group" : "checkbox-group")}>
-                      {group.options.map((opt: any) => {
-                        const isSelected = (selections[group.id] || []).includes(opt.id);
-                        const isMaxReached = (selections[group.id] || []).length >= group.maxChoices;
-                        const disabled = !isSelected && isMaxReached && group.maxChoices > 1;
+          {/* 2. Meio a Meio — só libera depois que Tamanho/Borda estão escolhidos, pra já filtrar
+              os sabores compatíveis e a interseção de opções corretamente. */}
+          {(product as any).allowsHalfAndHalf && (
+            <section className="highlight-section" style={{ marginTop: '24px', marginBottom: '24px', paddingBottom: '32px' }}>
+              <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-full)', padding: '6px', marginBottom: '12px' }}>
+                <button
+                  onClick={() => { setIsHalfAndHalf(false); setSecondHalfProductId(''); }}
+                  style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: !isHalfAndHalf ? 'var(--primary)' : 'transparent', color: !isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                >
+                  🍕 Inteira
+                </button>
+                <button
+                  onClick={() => { if (sharedGroupsValid) setIsHalfAndHalf(true); }}
+                  disabled={!sharedGroupsValid}
+                  title={!sharedGroupsValid ? 'Escolha as opções acima primeiro' : undefined}
+                  style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: isHalfAndHalf ? 'var(--primary)' : 'transparent', color: isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: sharedGroupsValid ? 'pointer' : 'not-allowed', opacity: sharedGroupsValid ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
+                >
+                  🌗 Meio a Meio
+                </button>
+              </div>
 
-                        if (group.groupType === 'counter') {
-                          // Render as Counter (- qty +)
-                          const qty = counterQuantities[opt.id] || 0;
-                          return (
-                            <div key={opt.id} className="counter-item">
-                              <div className="counter-item-info">
-                                <span className="name">{opt.name}</span>
-                                <span className="price">{opt.additionalPrice > 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : 'Grátis'}</span>
-                              </div>
-                              <div className="counter-controls">
-                                <button 
-                                  type="button"
-                                  className="counter-btn"
-                                  onClick={() => handleCounterChange(group.id, opt.id, -1, group.maxChoices)}
-                                  disabled={qty === 0}
-                                >
-                                  <Minus size={14} />
-                                </button>
-                                <span className="counter-value">{qty}</span>
-                                <button 
-                                  type="button"
-                                  className="counter-btn"
-                                  onClick={() => handleCounterChange(group.id, opt.id, 1, group.maxChoices)}
-                                >
-                                  <Plus size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        } else if (group.maxChoices === 1) {
-                          // Render as Radio Buttons
-                          return (
-                            <label key={opt.id} className={`radio-card ${isSelected ? 'selected' : ''}`}>
-                              <input 
-                                type="radio" 
-                                name={`group_${group.id}`} 
-                                checked={isSelected} 
-                                onChange={() => handleToggleOption(group.id, opt.id, group.maxChoices)} 
-                              />
-                              <div className="radio-info">
-                                <span className="name">{opt.name}</span>
-                                <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : (opt.additionalPrice < 0 ? `- R$ ${formatCurrency(Math.abs(opt.additionalPrice))}` : (product.price === 0 ? `R$ ${formatCurrency(opt.additionalPrice)}` : ''))}</span>
-                              </div>
-                            </label>
-                          );
-                        } else {
-                          // Render as Checkboxes
-                          return (
-                            <label key={opt.id} className={`checkbox-item ${disabled ? 'disabled' : ''}`} style={{ opacity: disabled ? 0.5 : 1 }}>
-                              <input 
-                                type="checkbox" 
-                                checked={isSelected} 
-                                disabled={disabled}
-                                onChange={() => handleToggleOption(group.id, opt.id, group.maxChoices)} 
-                              />
-                              <span className="name">{opt.name}</span>
-                              <span className="price">{opt.additionalPrice > 0 ? `+ R$ ${formatCurrency(opt.additionalPrice)}` : ''}</span>
-                            </label>
-                          );
-                        }
-                      })}
-                    </div>
-                  </section>
-                );
-              })}
-
-              {/* Half and Half UI Section */}
-              {(product as any).allowsHalfAndHalf && (
-                <section className="highlight-section" style={{ marginTop: '24px', marginBottom: '24px', paddingBottom: '32px' }}>
-                  {/* Tab Switcher */}
-                  <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-full)', padding: '6px', marginBottom: '20px' }}>
-                    <button 
-                      onClick={() => { setIsHalfAndHalf(false); setSecondHalfProductId(''); }}
-                      style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: !isHalfAndHalf ? 'var(--primary)' : 'transparent', color: !isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-                    >
-                      🍕 Inteira
-                    </button>
-                    <button 
-                      onClick={() => setIsHalfAndHalf(true)}
-                      style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: isHalfAndHalf ? 'var(--primary)' : 'transparent', color: isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-                    >
-                      🌗 Meio a Meio
-                    </button>
-                  </div>
-                  
-                  {isHalfAndHalf && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                      
-                      {/* Metade 2 (Seleção) */}
-                      <div>
-                        <p style={{ fontSize: '17px', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          Escolha a 2ª Metade
-                        </p>
-                        
-                        <div style={{ position: 'relative', marginBottom: '16px' }}>
-                          <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                          <input 
-                            type="text" 
-                            placeholder="Buscar sabor para a 2ª metade..." 
-                            value={searchHalf}
-                            onChange={(e) => setSearchHalf(e.target.value)}
-                            style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '15px', outline: 'none', transition: 'all 0.2s ease' }}
-                            onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-                            onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                          />
-                        </div>
-
-                        <div 
-                          ref={carouselRef}
-                          className="hide-scrollbar" 
-                          style={{ 
-                            display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px', 
-                            scrollSnapType: isDragging ? 'none' : 'x mandatory', 
-                            margin: '0 -24px', padding: '0 24px 16px 24px', 
-                            scrollBehavior: isDragging ? 'auto' : 'smooth', 
-                            cursor: isDragging ? 'grabbing' : 'grab' 
-                          }}
-                          onMouseDown={handleMouseDown}
-                          onMouseLeave={handleMouseLeave}
-                          onMouseUp={handleMouseUp}
-                          onMouseMove={handleMouseMove}
-                        >
-                          {availableProducts
-                            .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
-                            .map(p => {
-                              const isSelected = secondHalfProductId === p.id;
-                              const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
-                              
-                              const sizeOption = selectedOptionObjects.find(opt => opt.groupName.toLowerCase().includes('tamanho') || opt.groupName.toLowerCase().includes('size'));
-                              const estimatedFlavorPrice = p.price + (sizeOption ? (sizeOption.additionalPrice || 0) : 0);
-                              
-                              return (
-                                <div 
-                                  key={p.id} 
-                                  onClick={() => {
-                                    if (dragDist > 10) return;
-                                    setSecondHalfProductId(isSelected ? '' : p.id);
-                                  }}
-                                  style={{ 
-                                    flex: '0 0 calc(95% - 16px)',
-                                    minWidth: '360px',
-                                    scrollSnapAlign: 'start',
-                                    display: 'flex', gap: '14px', padding: '16px', 
-                                    border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.05)', 
-                                    borderRadius: 'var(--radius-md)', 
-                                    backgroundColor: isSelected ? 'rgba(255,87,34,0.08)' : 'rgba(0,0,0,0.2)',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    alignItems: 'center',
-                                    userSelect: 'none'
-                                  }}
-                                >
-                                  {img ? (
-                                    <img src={img} alt={p.name} draggable={false} style={{ width: '84px', height: '84px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
-                                  ) : (
-                                    <div style={{ width: '84px', height: '84px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', flexShrink: 0 }}>🍕</div>
-                                  )}
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
-                                    <span style={{ fontWeight: 700, fontSize: '18px', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{p.name}</span>
-                                    {p.description && (
-                                      <span style={{ 
-                                        fontSize: '14px', 
-                                        color: isSelected ? 'rgba(255,255,255,0.95)' : 'var(--text-muted)', 
-                                        lineHeight: '1.3'
-                                      }}>
-                                        {p.description}
-                                      </span>
-                                    )}
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                                      <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {formatCurrency(estimatedFlavorPrice)}</span>
-                                      {sizeOption && (
-                                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                          Tam: {sizeOption.name}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div style={{ paddingLeft: '4px', flexShrink: 0 }}>
-                                    {isSelected ? (
-                                      <CheckCircle2 size={28} color="var(--primary)" />
-                                    ) : (
-                                      <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })
-                          }
-                          
-                          {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).length === 0 && (
-                            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
-                              Nenhum sabor encontrado com "{searchHalf}"
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {loadingSecondHalf && (
-                        <div style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                          <div className="global-spinner" style={{ width: '14px', height: '14px', borderWidth: '2px' }} />
-                          Carregando informações do sabor...
-                        </div>
-                      )}
-                      
-                      <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginTop: '8px', textAlign: 'center' }}>
-                        💡 O valor da pizza meio a meio será calculado pelo sabor mais caro.
-                      </div>
-                      
-                      {!loadingSecondHalf && secondHalfProductId && halfAndHalfExtraPrice > 0 && (
-                        <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '8px' }}>
-                          <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {formatCurrency(halfAndHalfExtraPrice)}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </section>
+              {!sharedGroupsValid && (
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', margin: '0 0 8px' }}>
+                  Escolha as opções acima para poder montar meio a meio.
+                </p>
               )}
 
+              {isHalfAndHalf && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
+                  {/* Metade 2 (Seleção) */}
+                  <div>
+                    <p style={{ fontSize: '17px', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      Escolha a 2ª Metade
+                    </p>
 
-              <section className="modal-section">
-                <div className="section-header">
-                  <h3>Alguma observação?</h3>
+                    <div style={{ position: 'relative', marginBottom: '16px' }}>
+                      <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                      <input
+                        type="text"
+                        placeholder="Buscar sabor para a 2ª metade..."
+                        value={searchHalf}
+                        onChange={(e) => setSearchHalf(e.target.value)}
+                        style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '15px', outline: 'none', transition: 'all 0.2s ease' }}
+                        onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
+                        onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
+                      />
+                    </div>
+
+                    <div
+                      ref={carouselRef}
+                      className="hide-scrollbar"
+                      style={{
+                        display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px',
+                        scrollSnapType: isDragging ? 'none' : 'x mandatory',
+                        margin: '0 -24px', padding: '0 24px 16px 24px',
+                        scrollBehavior: isDragging ? 'auto' : 'smooth',
+                        cursor: isDragging ? 'grabbing' : 'grab'
+                      }}
+                      onMouseDown={handleMouseDown}
+                      onMouseLeave={handleMouseLeave}
+                      onMouseUp={handleMouseUp}
+                      onMouseMove={handleMouseMove}
+                    >
+                      {availableProducts
+                        .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
+                        .filter(candidateOffersCurrentSharedSelection)
+                        .map(p => {
+                          const isSelected = secondHalfProductId === p.id;
+                          const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
+
+                          // Preço estimado usando o que ESSE sabor cobra pelas mesmas opções compartilhadas já escolhidas.
+                          const candidateGroups: any[] = p.optionGroups || [];
+                          const sharedExtra = sharedGroups.reduce((sum: number, g: any) => {
+                            const selectedIds = selections[g.id] || [];
+                            const candidateGroup = candidateGroups.find((cg: any) => cg.id === g.id);
+                            return sum + selectedIds.reduce((s: number, itemId: string) => {
+                              const opt = candidateGroup?.options.find((o: any) => o.id === itemId);
+                              return s + (opt?.additionalPrice || 0);
+                            }, 0);
+                          }, 0);
+                          const estimatedFlavorPrice = p.price + sharedExtra;
+
+                          const selectedBadges = sharedGroups.flatMap((g: any) =>
+                            (selections[g.id] || []).map((itemId: string) => g.options.find((o: any) => o.id === itemId)?.name).filter(Boolean)
+                          );
+
+                          return (
+                            <div
+                              key={p.id}
+                              onClick={() => {
+                                if (dragDist > 10) return;
+                                setSecondHalfProductId(isSelected ? '' : p.id);
+                              }}
+                              style={{
+                                flex: '0 0 calc(95% - 16px)',
+                                minWidth: '360px',
+                                scrollSnapAlign: 'start',
+                                display: 'flex', gap: '14px', padding: '16px',
+                                border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.05)',
+                                borderRadius: 'var(--radius-md)',
+                                backgroundColor: isSelected ? 'rgba(255,87,34,0.08)' : 'rgba(0,0,0,0.2)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                alignItems: 'center',
+                                userSelect: 'none'
+                              }}
+                            >
+                              {img ? (
+                                <img src={img} alt={p.name} draggable={false} style={{ width: '84px', height: '84px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
+                              ) : (
+                                <div style={{ width: '84px', height: '84px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', flexShrink: 0 }}>🍕</div>
+                              )}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
+                                <span style={{ fontWeight: 700, fontSize: '18px', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{p.name}</span>
+                                {p.description && (
+                                  <span style={{
+                                    fontSize: '14px',
+                                    color: isSelected ? 'rgba(255,255,255,0.95)' : 'var(--text-muted)',
+                                    lineHeight: '1.3'
+                                  }}>
+                                    {p.description}
+                                  </span>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {formatCurrency(estimatedFlavorPrice)}</span>
+                                  {selectedBadges.map((label, idx) => (
+                                    <span key={idx} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {label}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                              <div style={{ paddingLeft: '4px', flexShrink: 0 }}>
+                                {isSelected ? (
+                                  <CheckCircle2 size={28} color="var(--primary)" />
+                                ) : (
+                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      }
+
+                      {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).filter(candidateOffersCurrentSharedSelection).length === 0 && (
+                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
+                          Nenhum sabor disponível com as opções escolhidas{searchHalf ? ` para "${searchHalf}"` : ''}.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginTop: '8px', textAlign: 'center' }}>
+                    💡 O valor da pizza meio a meio será calculado pelo sabor mais caro.
+                  </div>
+
+                  {secondHalfProductId && halfAndHalfExtraPrice > 0 && (
+                    <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '8px' }}>
+                      <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {formatCurrency(halfAndHalfExtraPrice)}
+                    </div>
+                  )}
                 </div>
-                <textarea 
-                  className="observation-input" 
-                  placeholder="Ex: Tirar a cebola, assar bem a massa..."
-                  value={observation}
-                  onChange={(e) => setObservation(e.target.value)}
-                />
-              </section>
-            </>
+              )}
+            </section>
           )}
+
+          {/* 3. Opções próprias do produto (ex: Adicionais extras) */}
+          {ownGroups.map(renderGroupSection)}
+
+          <section className="modal-section">
+            <div className="section-header">
+              <h3>Alguma observação?</h3>
+            </div>
+            <textarea
+              className="observation-input"
+              placeholder="Ex: Tirar a cebola, assar bem a massa..."
+              value={observation}
+              onChange={(e) => setObservation(e.target.value)}
+            />
+          </section>
         </div>
 
         <div className="modal-footer">
@@ -557,8 +562,8 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
             <span>{quantity}</span>
             <button onClick={() => setQuantity(quantity + 1)}><Plus size={18} /></button>
           </div>
-          <button 
-            className="confirm-btn" 
+          <button
+            className="confirm-btn"
             onClick={handleConfirm}
             style={{ opacity: isValid ? 1 : 0.5 }}
           >
