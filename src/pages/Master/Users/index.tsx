@@ -144,7 +144,7 @@ export default function MasterUsers() {
           <p className="page-subtitle">Gerencie os usuários administrativos do SaaS</p>
         </div>
         {hasPermission('MasterTeam:Create') && (
-          <button className="btn-primary" onClick={openModal}>
+          <button className="btn-primary" onClick={() => openModal()}>
             <Plus size={20} />
             Novo Usuário
           </button>

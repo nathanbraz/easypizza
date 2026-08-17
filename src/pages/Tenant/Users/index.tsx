@@ -145,7 +145,7 @@ export default function TenantUsers() {
           <p className="page-subtitle">Gerencie os funcionários e acessos</p>
         </div>
         {hasPermission('Team:Create') && (
-          <button className="btn-primary" onClick={openModal}>
+          <button className="btn-primary" onClick={() => openModal()}>
             <Plus size={20} />
             Novo Usuário
           </button>

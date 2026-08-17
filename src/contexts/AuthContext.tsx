@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { api, STAFF_TOKEN_KEY } from '../lib/api';
 
 export interface UserInfo {
