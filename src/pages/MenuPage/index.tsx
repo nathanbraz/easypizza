@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, MessageCircle, ListOrdered, Zap, RotateCcw, Search, X, Home } from 'lucide-react';
+import { MapPin, MessageCircle, ListOrdered, Zap, Search, X, Home, Clock } from 'lucide-react';
 import ProductCard from '../../components/ProductCard';
 import Cart from '../../components/Cart';
 import ProductModal from '../../components/ProductModal';
@@ -222,7 +222,18 @@ export default function MenuPage() {
         </div>
       )}
 
-      <header className="header glass-panel">
+      {storeSettings?.bannerUrl && (
+        <div className="hero-banner">
+          <img src={storeSettings.bannerUrl} alt="" />
+          {storeSettings?.logoUrl && (
+            <div className="hero-logo">
+              <img src={storeSettings.logoUrl} alt="Logo" />
+            </div>
+          )}
+        </div>
+      )}
+
+      <header className={`header glass-panel ${storeSettings?.bannerUrl ? 'header-with-banner' : ''}`}>
         <div className="header-info">
           <h1>{customerInfo ? `Olá, ${customerInfo.customerName}!` : 'EasyPizza'}</h1>
           <div className="header-actions">
@@ -230,6 +241,12 @@ export default function MenuPage() {
               <span className="dot" style={{ backgroundColor: storeSettings?.isStoreOpen === false ? '#ef4444' : undefined }}></span>
               {storeSettings?.isStoreOpen === false ? 'Fechado no momento' : 'Aberto agora'}
             </div>
+            {storeSettings?.estimatedDeliveryTimeMin > 0 && (
+              <div className="delivery-time-badge">
+                <Clock size={14} />
+                {storeSettings.estimatedDeliveryTimeMin} a {storeSettings.estimatedDeliveryTimeMax} min
+              </div>
+            )}
           </div>
         </div>
         <div className="header-address">
@@ -239,26 +256,6 @@ export default function MenuPage() {
       </header>
 
       <main className="menu-content">
-        {customerInfo?.lastOrderSummary && (
-          <div className="reorder-card glass-panel animate-slide-up">
-            <div className="reorder-card-left">
-              <div className="reorder-icon-wrapper">
-                <RotateCcw size={20} />
-              </div>
-              <div className="reorder-info">
-                <h3>Quer pedir de novo? 🍕</h3>
-                <p>{customerInfo.lastOrderSummary}</p>
-              </div>
-            </div>
-            <button
-              className="reorder-action-btn"
-              onClick={() => navigate(customerInfo.lastOrderId ? `/tracker/${customerInfo.lastOrderId}` : '/tracker')}
-            >
-              Pedir Novamente
-            </button>
-          </div>
-        )}
-
         <div className="search-bar">
           <Search size={16} color="var(--text-muted)" />
           <input
