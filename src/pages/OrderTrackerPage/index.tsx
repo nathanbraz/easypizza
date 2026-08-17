@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, CheckCircle, ChefHat, Bike, FileCheck, AlertCircle, RefreshCw, XCircle } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, ChefHat, Bike, FileCheck, AlertCircle, RefreshCw, XCircle, RotateCcw, QrCode, Copy, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
 import './OrderTrackerPage.css';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -14,6 +15,13 @@ export default function OrderTrackerPage() {
   const [historyOrders, setHistoryOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pixCopied, setPixCopied] = useState(false);
+
+  // "Quer pedir de novo?" — mesmo dado que a MenuPage já grava no localStorage ao carregar a sessão.
+  const [customerInfo] = useState<any | null>(() => {
+    const saved = localStorage.getItem('@EasyPizza:CustomerInfo');
+    return saved ? JSON.parse(saved) : null;
+  });
 
   const tenantSlug = getTenantSlugFromUrl();
 
@@ -126,6 +134,26 @@ export default function OrderTrackerPage() {
       </header>
 
       <main className="tracker-content">
+        {customerInfo?.lastOrderSummary && (
+          <div className="reorder-card glass-panel animate-slide-up">
+            <div className="reorder-card-left">
+              <div className="reorder-icon-wrapper">
+                <RotateCcw size={20} />
+              </div>
+              <div className="reorder-info">
+                <h3>Quer pedir de novo? 🍕</h3>
+                <p>{customerInfo.lastOrderSummary}</p>
+              </div>
+            </div>
+            <button
+              className="reorder-action-btn"
+              onClick={() => navigate(customerInfo.lastOrderId ? `/tracker/${customerInfo.lastOrderId}` : '/tracker')}
+            >
+              Pedir Novamente
+            </button>
+          </div>
+        )}
+
         <div className="tracker-tabs">
           <button 
             className={`tracker-tab ${activeTab === 'tracker' ? 'active' : ''}`}
@@ -180,6 +208,53 @@ export default function OrderTrackerPage() {
                     <div className="approval-banner-info">
                       <h3 style={{ color: '#ef4444' }}>Pedido Cancelado</h3>
                       <p>Infelizmente este pedido foi cancelado pela loja. Entre em contato pelo WhatsApp para mais informações.</p>
+                    </div>
+                  </div>
+                )}
+
+                {order.paymentType?.isOnlinePayment && order.isPaid && (
+                  <div className="payment-approved-banner animate-slide-up">
+                    <CheckCircle size={32} color="#22c55e" style={{ flexShrink: 0 }} />
+                    <div className="approval-banner-info">
+                      <h3 style={{ color: '#22c55e' }}>Pagamento Aprovado</h3>
+                      <p>Recebemos a confirmação do seu pagamento via Pix. Seu pedido já está sendo preparado!</p>
+                    </div>
+                  </div>
+                )}
+
+                {order.paymentType?.isOnlinePayment && !order.isPaid && order.pixCopyPasteCode && (
+                  <div className="pix-payment-card glass-panel animate-slide-up">
+                    <div className="pix-payment-header">
+                      <QrCode size={26} color="var(--primary)" />
+                      <div>
+                        <h3>Pague com Pix para confirmar seu pedido</h3>
+                        <p>Escaneie o QR code ou copie o código abaixo no app do seu banco. A confirmação é automática, não precisa recarregar a página.</p>
+                      </div>
+                    </div>
+
+                    <div className="pix-qr-wrapper">
+                      <QRCodeSVG value={order.pixCopyPasteCode} size={180} />
+                    </div>
+
+                    <div className="pix-copy-row">
+                      <input type="text" readOnly value={order.pixCopyPasteCode} className="pix-copy-input" />
+                      <button
+                        type="button"
+                        className="pix-copy-btn"
+                        onClick={() => {
+                          navigator.clipboard.writeText(order.pixCopyPasteCode);
+                          setPixCopied(true);
+                          setTimeout(() => setPixCopied(false), 2500);
+                        }}
+                      >
+                        {pixCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {pixCopied ? 'Copiado!' : 'Copiar código'}
+                      </button>
+                    </div>
+
+                    <div className="pix-waiting-indicator">
+                      <span className="pix-waiting-spinner" />
+                      Aguardando confirmação do pagamento...
                     </div>
                   </div>
                 )}
