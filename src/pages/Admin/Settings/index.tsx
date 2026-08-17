@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Edit2, X, Check, XCircle } from 'lucide-react';
-import { api } from '../../../lib/api';
+import { Plus, Edit2, X, Check, XCircle, Image as ImageIcon, Copy } from 'lucide-react';
+import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import '../Catalog/Catalog.css';
 import './Settings.css';
@@ -14,6 +14,13 @@ export default function SettingsManager() {
   const [storeSettings, setStoreSettings] = useState<any>(null);
   const [paymentTypes, setPaymentTypes] = useState<any[]>([]);
   const [savingSettings, setSavingSettings] = useState(false);
+
+  // Identidade visual (logo e capa do cardápio) — enviadas de imediato pro upload, mas só
+  // gravadas nas configurações quando o admin clicar em "Salvar Alterações", igual ao resto do form.
+  const [logoUrl, setLogoUrl] = useState<string>('');
+  const [bannerUrl, setBannerUrl] = useState<string>('');
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
 
   // Estado dos Cupons
   const [coupons, setCoupons] = useState<any[]>([]);
@@ -34,11 +41,49 @@ export default function SettingsManager() {
 
   const loadSettings = async () => {
     try {
-      const res = await api.get('/settings');
+      // Rota autenticada (não a pública do cardápio) — só ela traz os indicadores
+      // hasWhatsappApiKey/hasPaymentGatewayAccessToken; as credenciais em si nunca voltam pro navegador.
+      const res = await api.get('/settings/admin');
       setStoreSettings(res.data.storeSettings);
       setPaymentTypes(res.data.paymentTypes);
+      setLogoUrl(res.data.storeSettings.logoUrl || '');
+      setBannerUrl(res.data.storeSettings.bannerUrl || '');
     } catch (error) {
       console.error('Error loading settings', error);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingLogo(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setLogoUrl(response.data.url);
+    } catch (error) {
+      console.error('Error uploading logo:', error);
+      alert('Erro ao enviar a logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setUploadingBanner(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setBannerUrl(response.data.url);
+    } catch (error) {
+      console.error('Error uploading banner:', error);
+      alert('Erro ao enviar a imagem de capa.');
+    } finally {
+      setUploadingBanner(false);
     }
   };
 
@@ -66,7 +111,9 @@ export default function SettingsManager() {
       acceptingPickup: formData.get('acceptingPickup') === 'on',
       acceptingDelivery: formData.get('acceptingDelivery') === 'on',
       messageOfTheDay: formData.get('messageOfTheDay')?.toString() || null,
-      activeGlobalCouponCode: formData.get('activeGlobalCouponCode')?.toString() || null
+      activeGlobalCouponCode: formData.get('activeGlobalCouponCode')?.toString() || null,
+      logoUrl: logoUrl || null,
+      bannerUrl: bannerUrl || null
     };
 
     try {
@@ -104,6 +151,32 @@ export default function SettingsManager() {
     } catch (error) {
       console.error(error);
       alert('Erro ao salvar configurações do WhatsApp.');
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
+  const handleUpdatePaymentSettings = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    // Em branco = manter o token já salvo (o backend trata string vazia/nula como "não mudou" —
+    // ver SettingsController.UpdateSettings). O campo nunca vem preenchido com o valor real.
+    const payload = {
+      ...storeSettings,
+      paymentGatewayAccessToken: formData.get('paymentGatewayAccessToken')?.toString() || null,
+      paymentGatewayWebhookSecret: formData.get('paymentGatewayWebhookSecret')?.toString() || null
+    };
+
+    try {
+      setSavingSettings(true);
+      await api.put('/settings', payload);
+      alert('Configurações de pagamento salvas com sucesso!');
+      loadSettings();
+      (e.target as HTMLFormElement).reset();
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao salvar configurações de pagamento.');
     } finally {
       setSavingSettings(false);
     }
@@ -230,6 +303,7 @@ export default function SettingsManager() {
         <div className="catalog-tabs" style={{ marginTop: '16px' }}>
           <button className={`tab-btn ${activeTab === 'geral' ? 'active' : ''}`} onClick={() => setActiveTab('geral')}>Gerais</button>
           <button className={`tab-btn ${activeTab === 'whatsapp' ? 'active' : ''}`} onClick={() => setActiveTab('whatsapp')}>WhatsApp & Robô</button>
+          <button className={`tab-btn ${activeTab === 'pagamentos' ? 'active' : ''}`} onClick={() => setActiveTab('pagamentos')}>Pagamentos</button>
           <button className={`tab-btn ${activeTab === 'cupons' ? 'active' : ''}`} onClick={() => setActiveTab('cupons')}>Cupons</button>
         </div>
       </header>
@@ -311,7 +385,38 @@ export default function SettingsManager() {
               <label>Aviso da Loja (Opcional)</label>
               <input type="text" name="messageOfTheDay" defaultValue={storeSettings.messageOfTheDay || ''} className="form-input" placeholder="Ex: Hoje o tempo de entrega pode ser maior devido a chuvas." />
             </div>
-            
+
+            <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+              <h3 style={{ margin: '0 0 4px' }}>Identidade Visual</h3>
+              <p className="setting-desc" style={{ margin: '0 0 16px' }}>Logo e foto de capa exibidas no topo do cardápio do cliente.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '24px' }}>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Logo (círculo no topo)</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                    <div style={{ width: '72px', height: '72px', borderRadius: '50%', overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {logoUrl ? <img src={logoUrl} alt="Logo" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={24} opacity={0.4} />}
+                    </div>
+                    <label htmlFor="logo-upload" className="btn-secondary" style={{ cursor: 'pointer', padding: '8px 14px' }}>
+                      {uploadingLogo ? 'Enviando...' : 'Escolher Arquivo'}
+                    </label>
+                    <input id="logo-upload" type="file" accept="image/*" onChange={handleLogoUpload} style={{ display: 'none' }} disabled={uploadingLogo} />
+                  </div>
+                </div>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label>Foto de Capa (topo do cardápio)</label>
+                  <div style={{ marginTop: '8px' }}>
+                    <div style={{ width: '100%', aspectRatio: '16/6', borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '8px' }}>
+                      {bannerUrl ? <img src={bannerUrl} alt="Capa" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={24} opacity={0.4} />}
+                    </div>
+                    <label htmlFor="banner-upload" className="btn-secondary" style={{ cursor: 'pointer', padding: '8px 14px', display: 'inline-block' }}>
+                      {uploadingBanner ? 'Enviando...' : 'Escolher Arquivo'}
+                    </label>
+                    <input id="banner-upload" type="file" accept="image/*" onChange={handleBannerUpload} style={{ display: 'none' }} disabled={uploadingBanner} />
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </form>
       )}
@@ -445,11 +550,10 @@ export default function SettingsManager() {
 
               <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                 <label style={{ fontWeight: '600', color: '#e2e8f0' }}>API Key / Token de Segurança</label>
-                <input 
-                  type="password" 
-                  name="whatsappApiKey" 
-                  defaultValue={storeSettings.whatsappApiKey || ''} 
-                  placeholder="Cole sua API Key do Evolution ou Z-API aqui" 
+                <input
+                  type="password"
+                  name="whatsappApiKey"
+                  placeholder={storeSettings.hasWhatsappApiKey ? '•••••••• (já configurada — deixe em branco pra manter)' : 'Cole sua API Key do Evolution ou Z-API aqui'}
                   style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
                 />
               </div>
@@ -475,6 +579,76 @@ export default function SettingsManager() {
                   }}
                 >
                   Copiar Link
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {activeTab === 'pagamentos' && storeSettings && (
+        <form className="settings-grid" onSubmit={handleUpdatePaymentSettings} style={{ marginTop: '24px' }}>
+          <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Mercado Pago (Pix)</h3>
+                <p className="setting-desc" style={{ margin: '4px 0 0 0' }}>Credencial usada para gerar cobranças Pix (QR code / copia-e-cola) e confirmar pagamentos automaticamente.</p>
+              </div>
+              <button type="submit" className="btn-primary" disabled={savingSettings} style={{ padding: '12px 24px', fontWeight: 'bold' }}>
+                {savingSettings ? 'Salvando...' : 'Salvar Alterações'}
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Access Token</label>
+                <input
+                  type="password"
+                  name="paymentGatewayAccessToken"
+                  placeholder={storeSettings.hasPaymentGatewayAccessToken ? '•••••••• (já configurado — deixe em branco pra manter)' : 'Cole aqui o Access Token (TEST-... ou APP_USR-...)'}
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+                <span className="setting-desc" style={{ marginTop: '6px' }}>
+                  {storeSettings.hasPaymentGatewayAccessToken
+                    ? `Configurado (${storeSettings.paymentGatewayProvider === 'MercadoPago' ? 'Mercado Pago' : storeSettings.paymentGatewayProvider || 'gateway'}). Só é possível trocá-lo, não visualizá-lo novamente.`
+                    : 'Encontrado em developers.mercadopago.com.br, na aplicação da loja, aba Credenciais.'}
+                </span>
+              </div>
+
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Chave Secreta do Webhook</label>
+                <input
+                  type="password"
+                  name="paymentGatewayWebhookSecret"
+                  placeholder={storeSettings.hasPaymentGatewayWebhookSecret ? '•••••••• (já configurada — deixe em branco pra manter)' : 'Cole aqui a Chave secreta em Webhooks'}
+                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                />
+                <span className="setting-desc" style={{ marginTop: '6px' }}>
+                  Usada para confirmar que a notificação de pagamento realmente veio do Mercado Pago. Sem ela, nenhuma confirmação automática é aceita.
+                </span>
+              </div>
+            </div>
+
+            <div style={{ marginTop: '28px', padding: '18px', borderRadius: '10px', background: 'rgba(255, 255, 255, 0.03)', border: '1px dashed rgba(255, 255, 255, 0.2)' }}>
+              <label style={{ fontSize: '13px', fontWeight: 'bold', color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>URL de Notificação (Somente Leitura)</label>
+              <p className="setting-desc" style={{ margin: '6px 0 14px 0', fontSize: '13px' }}>Cole essa URL em "Suas integrações" &gt; sua aplicação &gt; Webhooks &gt; Configurar notificações, selecionando o evento "Order".</p>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={`http://localhost:5000/api/webhook/mercadopago/${getTenantSlugFromUrl()}`}
+                  style={{ flex: 1, minWidth: '250px', padding: '12px 14px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: '#cbd5e1', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', padding: '12px 18px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontWeight: '600', cursor: 'pointer' }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(`http://localhost:5000/api/webhook/mercadopago/${getTenantSlugFromUrl()}`);
+                    alert('URL de notificação copiada com sucesso para a área de transferência!');
+                  }}
+                >
+                  <Copy size={15} /> Copiar Link
                 </button>
               </div>
             </div>
