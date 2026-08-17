@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox } from 'lucide-react';
+import { RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox, ChevronDown, Phone, Clock, DollarSign } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import './Orders.css';
 
 type ColumnStatus = 'new' | 'preparing' | 'delivering' | 'done';
+
+const STATUS_BY_COLUMN: Record<ColumnStatus, number> = {
+  new: 1,
+  preparing: 2,
+  delivering: 3,
+  done: 4,
+};
+
+const STATUS_ACCENT: Record<ColumnStatus, string> = {
+  new: '#fb923c',
+  preparing: '#60a5fa',
+  delivering: '#22d3ee',
+  done: '#4ade80',
+};
 
 interface OrderItem {
   id?: string;
@@ -46,6 +60,7 @@ interface Order {
     name?: string;
   };
   changeFor?: number;
+  isPaid?: boolean;
   items?: OrderItem[];
 }
 
@@ -53,6 +68,21 @@ export default function OrdersDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [openMenuOrderId, setOpenMenuOrderId] = useState<string | number | null>(null);
+  const [sortDirections, setSortDirections] = useState<Record<ColumnStatus, 'asc' | 'desc'>>({
+    new: 'asc',
+    preparing: 'asc',
+    delivering: 'asc',
+    done: 'asc',
+  });
+
+  // Fecha o menu "Ações" ao clicar fora dele
+  useEffect(() => {
+    if (openMenuOrderId === null) return;
+    const closeMenu = () => setOpenMenuOrderId(null);
+    document.addEventListener('click', closeMenu);
+    return () => document.removeEventListener('click', closeMenu);
+  }, [openMenuOrderId]);
 
   const fetchOrders = async () => {
     try {
@@ -85,9 +115,13 @@ export default function OrdersDashboard() {
   };
 
   const getOrdersByColumn = (colId: ColumnStatus) => {
+    const direction = sortDirections[colId];
     return orders
       .filter(o => getColumnForStatus(o.status) === colId)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      .sort((a, b) => {
+        const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        return direction === 'asc' ? diff : -diff;
+      });
   };
 
   const moveOrder = async (orderId: string | number, nextStatus: number) => {
@@ -114,6 +148,17 @@ export default function OrdersDashboard() {
     } catch {
       return '';
     }
+  };
+
+  const getElapsedLabel = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.max(0, Math.floor(diffMs / 60000));
+    if (minutes < 1) return 'Agora';
+    if (minutes < 60) return `Há ${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return `Há ${hours}h${remainder > 0 ? ` ${remainder}m` : ''}`;
   };
 
   const getItemsSummary = (order: Order) => {
@@ -357,22 +402,25 @@ export default function OrdersDashboard() {
                 e.currentTarget.classList.remove('drag-over');
                 const orderId = e.dataTransfer.getData('text/plain');
                 if (orderId) {
-                  const statusMap: Record<ColumnStatus, number> = {
-                    new: 1,
-                    preparing: 2,
-                    delivering: 3,
-                    done: 4
-                  };
-                  moveOrder(orderId, statusMap[col.id]);
+                  moveOrder(orderId, STATUS_BY_COLUMN[col.id]);
                 }
               }}
             >
               <div className="kanban-column-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: col.color, boxShadow: `0 0 8px ${col.color}` }}></span>
-                  <h3 style={{ color: col.id === 'new' ? '#ffedd5' : 'var(--text-main)' }}>{col.title}</h3>
+                <div className="kanban-column-title">
+                  <span className="kanban-dot" style={{ backgroundColor: col.color, boxShadow: `0 0 8px ${col.color}` }}></span>
+                  <h3>{col.title}</h3>
+                  <span className="kanban-badge" style={{ backgroundColor: `${col.color}20`, color: col.color, border: `1px solid ${col.color}40` }}>{colOrders.length}</span>
                 </div>
-                <span className="kanban-badge" style={{ backgroundColor: `${col.color}20`, color: col.color, border: `1px solid ${col.color}40` }}>{colOrders.length}</span>
+                <select
+                  className="kanban-sort-select"
+                  value={sortDirections[col.id]}
+                  onChange={(e) => setSortDirections(prev => ({ ...prev, [col.id]: e.target.value as 'asc' | 'desc' }))}
+                  title="Ordenar pedidos desta coluna"
+                >
+                  <option value="asc">Mais antigos</option>
+                  <option value="desc">Mais recentes</option>
+                </select>
               </div>
               <div className="kanban-cards">
                 {colOrders.length === 0 ? (
@@ -398,29 +446,88 @@ export default function OrdersDashboard() {
                       }}
                     >
                       <div className="order-card-header">
-                        <span className="order-id">{formatId(order.id)}</span>
-                        <span className="order-time">{formatTime(order.createdAt)}</span>
-                      </div>
-                      <div className="order-customer">{order.customer?.name || 'Cliente'}</div>
-                      <div className="order-items" style={{ whiteSpace: 'pre-line' }}>{getItemsSummary(order)}</div>
-                      <div className="order-footer">
-                        <span className="order-total">R$ {formatCurrency(order.totalAmount ?? order.subTotal ?? 0)}</span>
-                        <div className="order-actions">
-                          <button 
-                            className="btn-icon" 
-                            onClick={() => setSelectedOrder(order)} 
-                            title="Detalhes do Pedido"
-                            style={{ color: 'var(--text-main)' }}
+                        <div className="order-id-time">
+                          <span className="order-id">{formatId(order.id)}</span>
+                          <span className="order-time-dot">·</span>
+                          <Clock size={11} />
+                          <span className="order-time" title={formatTime(order.createdAt)}>{getElapsedLabel(order.createdAt)}</span>
+                        </div>
+                        <div className="order-actions-menu">
+                          <button
+                            className="btn-actions-toggle"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuOrderId(openMenuOrderId === order.id ? null : order.id);
+                            }}
                           >
-                            <Eye size={18} />
+                            + Ações <ChevronDown size={13} />
                           </button>
-                          <button 
-                            className="btn-icon" 
-                            onClick={() => printOrderTicket(order)} 
-                            title="Imprimir Pedido"
-                            style={{ color: 'var(--text-main)' }}
+                          {openMenuOrderId === order.id && (
+                            <div className="actions-dropdown" onClick={(e) => e.stopPropagation()}>
+                              <button onClick={() => { setSelectedOrder(order); setOpenMenuOrderId(null); }}>
+                                <Eye size={14} /> Ver Detalhes
+                              </button>
+                              <button onClick={() => { printOrderTicket(order); setOpenMenuOrderId(null); }}>
+                                <Printer size={14} /> Imprimir Cupom
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="order-card-body">
+                        <div className="order-customer-row">
+                          <span className="order-customer">{order.customer?.name || 'Cliente'}</span>
+                          <span className={`payment-badge ${order.isPaid ? 'paid' : 'pending'}`}>
+                            {order.isPaid ? 'Pago' : 'Pendente'}
+                          </span>
+                        </div>
+                        <div className="order-payment-row">
+                          <span className="order-payment-method">
+                            <CreditCard size={11} />
+                            {order.paymentType?.name || 'Não informado'}
+                          </span>
+                          <span className="order-total">R$ {formatCurrency(order.totalAmount ?? order.subTotal ?? 0)}</span>
+                        </div>
+                        <div className="order-phone">
+                          <Phone size={11} />
+                          {formatPhone(order.customer?.phoneNumber || order.customer?.PhoneNumber)}
+                        </div>
+                        <div className="order-address">
+                          <MapPin size={11} />
+                          <span>
+                            {Number(order.type) === 2 || order.type === 'Pickup'
+                              ? 'Retirada no balcão'
+                              : order.address
+                                ? `${order.address.neighborhood ? order.address.neighborhood + ' - ' : ''}${order.address.street || 'Endereço não informado'}`
+                                : 'Endereço não informado'}
+                          </span>
+                        </div>
+                        <div className="order-items" style={{ whiteSpace: 'pre-line' }}>{getItemsSummary(order)}</div>
+                      </div>
+                      <div className="order-footer">
+                        <div className="order-status-wrapper">
+                          <select
+                            className={`order-status-select status-${col.id}`}
+                            value={STATUS_BY_COLUMN[col.id]}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => moveOrder(order.id, Number(e.target.value))}
                           >
-                            <Printer size={18} />
+                            <option value={1}>Novo</option>
+                            <option value={2}>Preparando</option>
+                            <option value={3}>Em Entrega</option>
+                            <option value={4}>Finalizado</option>
+                          </select>
+                          <ChevronDown size={12} className="order-status-chevron" style={{ color: STATUS_ACCENT[col.id] }} />
+                        </div>
+                        <div className="order-footer-actions">
+                          <button className="btn-icon-footer" onClick={(e) => { e.stopPropagation(); printOrderTicket(order); }} title="Imprimir Cupom">
+                            <Printer size={15} />
+                          </button>
+                          <button className="btn-icon-footer disabled" onClick={(e) => e.stopPropagation()} title="Em breve">
+                            <DollarSign size={15} />
+                          </button>
+                          <button className="btn-icon-footer" onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }} title="Ver Detalhes">
+                            <Eye size={15} />
                           </button>
                         </div>
                       </div>
