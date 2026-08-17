@@ -31,6 +31,9 @@ builder:
 proxy:
   ssl: true
   hosts:
+    # Painel Master (dono do SaaS) — isMaster() em lib/api.ts liga o modo Master quando o
+    # hostname começa com "admin." (não é "master.", apesar do nome dos endpoints e do path).
+    - admin.nathanbraz.dev
     - pizzatop10.nathanbraz.dev
   healthcheck:
     path: /
