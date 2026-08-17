@@ -1,0 +1,36 @@
+# Ambiente de homologação do EasyPizza (frontend) — mesma VPS do nathanbraz.dev e do
+# backend (easypizzab). Cada loja tem seu próprio subdomínio (https://{slug}.nathanbraz.dev).
+#
+# IMPORTANTE: sem TLS on-demand (não é suportado pelo deploy.yml do Kamal — ver decisão
+# registrada na sessão que criou este arquivo). A lista de hosts abaixo é estática: toda
+# loja nova cadastrada no painel Master precisa ser adicionada aqui manualmente, seguido de
+# um novo `kamal deploy` (rápido, a infra já existe — não é o `setup` demorado da primeira vez).
+service: easypizza-homolog
+
+# Mesma conta do GitHub Container Registry já usada pelo nathanbraz.dev e pelo easypizzab.
+image: nathanbraz/easypizza
+
+servers:
+  web:
+    - 179.198.123.31
+
+registry:
+  server: ghcr.io
+  username: nathanbraz
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  dockerfile: Dockerfile.production
+  args:
+    # import.meta.env.VITE_API_URL é embutido no build estático (não existe leitura de env
+    # em runtime num SPA servido por nginx) — por isso vai aqui, não em env.clear/secret.
+    VITE_API_URL: https://api.nathanbraz.dev/api
+
+proxy:
+  ssl: true
+  hosts:
+    - pizzatop10.nathanbraz.dev
+  healthcheck:
+    path: /
