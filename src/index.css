@@ -43,6 +43,9 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* Remove o retângulo azul que o navegador mobile pisca ao tocar em qualquer elemento
+     clicável — ele ignora border-radius, então em botão/checkbox redondo sempre destoava. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
