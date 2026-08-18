@@ -7,6 +7,11 @@ import '../Catalog/Catalog.css';
 import './Settings.css';
 import { formatCurrency } from '../../../utils/formatCurrency';
 
+// Base pra montar as URLs de webhook exibidas nesta tela — mesma variável que já
+// configura pra onde o axios manda as requisições (ver lib/api.ts), então acompanha
+// o ambiente real (local, homologação etc.) em vez de ficar fixa em localhost.
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
 export default function SettingsManager() {
   const [activeTab, setActiveTab] = useState('geral');
   
@@ -566,15 +571,15 @@ export default function SettingsManager() {
                 <input 
                   type="text" 
                   readOnly 
-                  value="http://localhost:5000/api/webhook/whatsapp/pizzariabrazil" 
+                  value={`${API_BASE_URL}/webhook/whatsapp/${getTenantSlugFromUrl()}`}
                   style={{ flex: 1, minWidth: '250px', padding: '12px 14px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: '#cbd5e1', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}
                 />
-                <button 
-                  type="button" 
-                  className="btn-secondary" 
+                <button
+                  type="button"
+                  className="btn-secondary"
                   style={{ whiteSpace: 'nowrap', padding: '12px 18px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontWeight: '600', cursor: 'pointer' }}
                   onClick={() => {
-                    navigator.clipboard.writeText('http://localhost:5000/api/webhook/whatsapp/pizzariabrazil');
+                    navigator.clipboard.writeText(`${API_BASE_URL}/webhook/whatsapp/${getTenantSlugFromUrl()}`);
                     alert('URL do Webhook copiada com sucesso para a área de transferência!');
                   }}
                 >
@@ -636,7 +641,7 @@ export default function SettingsManager() {
                 <input
                   type="text"
                   readOnly
-                  value={`http://localhost:5000/api/webhook/mercadopago/${getTenantSlugFromUrl()}`}
+                  value={`${API_BASE_URL}/webhook/mercadopago/${getTenantSlugFromUrl()}`}
                   style={{ flex: 1, minWidth: '250px', padding: '12px 14px', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', color: '#cbd5e1', borderRadius: '6px', fontSize: '13px', fontFamily: 'monospace' }}
                 />
                 <button
@@ -644,7 +649,7 @@ export default function SettingsManager() {
                   className="btn-secondary"
                   style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap', padding: '12px 18px', borderRadius: '6px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: 'white', fontWeight: '600', cursor: 'pointer' }}
                   onClick={() => {
-                    navigator.clipboard.writeText(`http://localhost:5000/api/webhook/mercadopago/${getTenantSlugFromUrl()}`);
+                    navigator.clipboard.writeText(`${API_BASE_URL}/webhook/mercadopago/${getTenantSlugFromUrl()}`);
                     alert('URL de notificação copiada com sucesso para a área de transferência!');
                   }}
                 >
