@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox, ChevronDown, Phone, Clock, DollarSign } from 'lucide-react';
+import { RefreshCw, X, User, MapPin, CreditCard, ShoppingBag, Eye, Printer, Inbox, ChevronDown, Phone, Clock, DollarSign, Ban, AlertTriangle } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import './Orders.css';
 
@@ -69,6 +69,9 @@ export default function OrdersDashboard() {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [openMenuOrderId, setOpenMenuOrderId] = useState<string | number | null>(null);
+  const [cancelingOrder, setCancelingOrder] = useState<Order | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
   const [sortDirections, setSortDirections] = useState<Record<ColumnStatus, 'asc' | 'desc'>>({
     new: 'asc',
     preparing: 'asc',
@@ -137,6 +140,24 @@ export default function OrdersDashboard() {
     } catch (error) {
       console.error("Erro ao atualizar status do pedido:", error);
       fetchOrders();
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelingOrder || !cancelReason.trim()) return;
+
+    setCancelSubmitting(true);
+    try {
+      const slug = getTenantSlugFromUrl();
+      await api.patch(`/orders/admin/${slug}/${cancelingOrder.id}/cancel`, { reason: cancelReason.trim() });
+      setCancelingOrder(null);
+      setCancelReason('');
+      fetchOrders();
+    } catch (error) {
+      console.error("Erro ao cancelar pedido:", error);
+      alert('Erro ao cancelar o pedido. Tente novamente.');
+    } finally {
+      setCancelSubmitting(false);
     }
   };
 
@@ -470,6 +491,12 @@ export default function OrdersDashboard() {
                               <button onClick={() => { printOrderTicket(order); setOpenMenuOrderId(null); }}>
                                 <Printer size={14} /> Imprimir Cupom
                               </button>
+                              <button
+                                className="action-danger"
+                                onClick={() => { setCancelingOrder(order); setCancelReason(''); setOpenMenuOrderId(null); }}
+                              >
+                                <Ban size={14} /> Cancelar Pedido
+                              </button>
                             </div>
                           )}
                         </div>
@@ -680,6 +707,52 @@ export default function OrdersDashboard() {
               </button>
               <button className="btn-close-modal" onClick={() => setSelectedOrder(null)}>
                 Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelingOrder && (
+        <div className="order-details-modal-overlay" onClick={() => !cancelSubmitting && setCancelingOrder(null)}>
+          <div className="order-details-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="order-details-header">
+              <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#ef4444' }}>
+                <AlertTriangle size={18} /> Cancelar Pedido #{cancelingOrder.id}
+              </h2>
+              <button className="btn-icon" onClick={() => setCancelingOrder(null)} title="Fechar" disabled={cancelSubmitting}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="order-details-body">
+              <p style={{ color: 'var(--text-secondary, #cbd5e1)', fontSize: '13px', marginBottom: '14px' }}>
+                O cliente será avisado do cancelamento pelo WhatsApp (se o robô estiver ativo). Essa ação não pode ser desfeita.
+              </p>
+              <div className="order-detail-section" style={{ flexDirection: 'column', alignItems: 'flex-start', display: 'flex' }}>
+                <label style={{ fontWeight: 600, marginBottom: '8px', fontSize: '13px' }}>Motivo do cancelamento *</label>
+                <textarea
+                  autoFocus
+                  rows={3}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Ex: Cliente desistiu, item em falta, endereço fora da área de entrega..."
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white', fontFamily: 'inherit', fontSize: '14px', resize: 'vertical' }}
+                />
+              </div>
+            </div>
+
+            <div className="order-details-footer" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+              <button className="btn-close-modal" onClick={() => setCancelingOrder(null)} disabled={cancelSubmitting}>
+                Voltar
+              </button>
+              <button
+                className="btn-action"
+                style={{ background: '#ef4444', borderColor: '#ef4444', color: 'white' }}
+                onClick={handleCancelOrder}
+                disabled={cancelSubmitting || !cancelReason.trim()}
+              >
+                {cancelSubmitting ? 'Cancelando...' : 'Confirmar Cancelamento'}
               </button>
             </div>
           </div>

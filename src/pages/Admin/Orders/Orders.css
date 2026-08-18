@@ -426,6 +426,11 @@
   color: var(--primary);
 }
 
+.actions-dropdown button.action-danger:hover {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
 .btn-action {
   background-color: rgba(249, 115, 22, 0.1);
   color: var(--primary);
