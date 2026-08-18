@@ -167,7 +167,8 @@ export default function SettingsManager() {
     const payload = {
       ...storeSettings,
       paymentGatewayAccessToken: formData.get('paymentGatewayAccessToken')?.toString() || null,
-      paymentGatewayWebhookSecret: formData.get('paymentGatewayWebhookSecret')?.toString() || null
+      paymentGatewayWebhookSecret: formData.get('paymentGatewayWebhookSecret')?.toString() || null,
+      paymentGatewaySandboxMode: formData.get('paymentGatewaySandboxMode') === 'on'
     };
 
     try {
@@ -525,6 +526,20 @@ export default function SettingsManager() {
               <button type="submit" className="btn-primary" disabled={savingSettings} style={{ padding: '12px 24px', fontWeight: 'bold' }}>
                 {savingSettings ? 'Salvando...' : 'Salvar Alterações'}
               </button>
+            </div>
+
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', marginBottom: '24px', padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)' }}>
+              <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Ambiente</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
+                <label className="toggle-switch">
+                  <input type="checkbox" name="paymentGatewaySandboxMode" defaultChecked={storeSettings.paymentGatewaySandboxMode} />
+                  <span className="slider"></span>
+                </label>
+                <span className="setting-desc">Marcado = Sandbox (credencial de teste). Desmarcado = Produção (credencial e dinheiro reais).</span>
+              </div>
+              <span className="setting-desc" style={{ marginTop: '6px' }}>
+                Precisa bater com o tipo de Access Token colado abaixo — sandbox e produção usam formato de e-mail de pagador diferente internamente, marcar errado quebra a geração do Pix.
+              </span>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
