@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle } from 'lucide-react';
+import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle, MessageCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import './Tenants.css';
@@ -23,6 +23,12 @@ export default function TenantsDashboard() {
   const [submitting, setSubmitting] = useState(false);
   const [migratingSlug, setMigratingSlug] = useState<string | null>(null);
   const [feedbackMsg, setFeedbackMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Modal de configuração da API Key do WhatsApp (Evolution API) — só o Master mexe nisso,
+  // é o token gerado ao criar a instância da loja no Manager UI.
+  const [whatsappModalTenant, setWhatsappModalTenant] = useState<Tenant | null>(null);
+  const [whatsappApiKeyInput, setWhatsappApiKeyInput] = useState('');
+  const [savingWhatsapp, setSavingWhatsapp] = useState(false);
 
   // Estado do Formulário
   const [name, setName] = useState('');
@@ -126,6 +132,25 @@ export default function TenantsDashboard() {
       fetchTenants(); // Recarrega para ver o novo status
     } catch (error: any) {
       setFeedbackMsg({ text: error.response?.data?.message || "Erro ao alterar status da empresa.", type: 'error' });
+    }
+  };
+
+  const handleSetWhatsappApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!whatsappModalTenant) return;
+
+    setSavingWhatsapp(true);
+    try {
+      await api.put(`/master/tenants/${whatsappModalTenant.slug}/whatsapp-api-key`, {
+        whatsappApiKey: whatsappApiKeyInput || null
+      });
+      setFeedbackMsg({ text: `API Key do WhatsApp de "${whatsappModalTenant.name}" atualizada.`, type: 'success' });
+      setWhatsappModalTenant(null);
+      setWhatsappApiKeyInput('');
+    } catch (error: any) {
+      setFeedbackMsg({ text: error.response?.data?.message || "Erro ao salvar a API Key do WhatsApp.", type: 'error' });
+    } finally {
+      setSavingWhatsapp(false);
     }
   };
 
@@ -254,6 +279,17 @@ export default function TenantsDashboard() {
                     <span>Acessar Painel</span>
                   </a>
 
+                  {hasPermission('Tenants:Edit') && (
+                    <button
+                      className="btn-secondary btn-sm"
+                      onClick={() => { setWhatsappModalTenant(tenant); setWhatsappApiKeyInput(''); }}
+                      title="Configurar instância do Evolution API pra esta loja"
+                    >
+                      <MessageCircle size={14} />
+                      <span>WhatsApp</span>
+                    </button>
+                  )}
+
                   {hasPermission('Tenants:Block') && (
                     <button 
                       className={`btn-secondary btn-sm ${tenant.isActive ? 'btn-danger-outline' : 'btn-success-outline'}`}
@@ -339,6 +375,51 @@ export default function TenantsDashboard() {
                       <span>Concluir Cadastro</span>
                     </>
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Configurar WhatsApp (Evolution API) */}
+      {whatsappModalTenant && (
+        <div className="modal-overlay">
+          <div className="modal-content glass-panel">
+            <div className="modal-header">
+              <h3>WhatsApp de "{whatsappModalTenant.name}"</h3>
+              <button className="close-btn" onClick={() => setWhatsappModalTenant(null)}>×</button>
+            </div>
+
+            <form onSubmit={handleSetWhatsappApiKey}>
+              <div className="modal-notice">
+                <MessageCircle size={18} className="text-accent" />
+                <p>
+                  1. Crie (ou confirme) a instância <strong>{whatsappModalTenant.slug}</strong> no
+                  {' '}Manager UI do Evolution API — o nome da instância precisa ser exatamente esse.<br />
+                  2. Configure o webhook da instância pra{' '}
+                  <code>/api/webhook/whatsapp/{whatsappModalTenant.slug}</code>.<br />
+                  3. Cole abaixo o token/hash gerado na criação da instância.
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label>API Key / Token da Instância</label>
+                <input
+                  type="password"
+                  placeholder="Cole o token gerado ao criar a instância"
+                  value={whatsappApiKeyInput}
+                  onChange={(e) => setWhatsappApiKeyInput(e.target.value)}
+                />
+                <small className="form-hint">Deixe em branco e salve pra remover a integração desta loja.</small>
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn-secondary" onClick={() => setWhatsappModalTenant(null)} disabled={savingWhatsapp}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary" disabled={savingWhatsapp}>
+                  {savingWhatsapp ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
