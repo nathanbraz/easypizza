@@ -193,6 +193,9 @@ input[type="number"] {
   border-radius: var(--radius-lg);
   padding: 1.5rem;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  /* Usado como wrapper de tabelas (Equipe, Cargos, Usuários Master) — em telas estreitas a
+     tabela rola horizontalmente aqui dentro em vez de cortar colunas como "Ações". */
+  overflow-x: auto;
 }
 
 /* Tables */

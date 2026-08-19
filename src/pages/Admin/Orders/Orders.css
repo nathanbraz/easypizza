@@ -612,6 +612,20 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Faixa de laptops menores (ex: 1366x768, resolução bem comum) — ainda no layout desktop lado
+   a lado, mas com gap e largura mínima de coluna reduzidos, pra caber as 4 colunas (Novos,
+   Preparando, Em Entrega, Finalizados) sem precisar rolar horizontalmente. Em telas Full HD
+   (1920px) pra cima nada muda, continua usando os valores originais definidos lá em cima. */
+@media (max-width: 1500px) {
+  .kds-kanban {
+    gap: 12px;
+  }
+
+  .kanban-column {
+    min-width: 240px;
+  }
+}
+
 /* Abaixo de ~768px (celular/tablet estreito), 4 colunas lado a lado não cabem de forma legível
    — troca pra ver uma coluna por vez, alternando pela barra de abas do topo (.kds-mobile-tabs).
    Fica no FINAL do arquivo de propósito: as regras de .kanban-column lá em cima também definem

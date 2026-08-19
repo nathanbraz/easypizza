@@ -518,6 +518,29 @@
   color: #f59e0b;
 }
 
+/* Mesmo ponto de quebra usado no resto da aplicação. Sem isso, os botões do cabeçalho
+   ("Sincronizar Todos os Bancos" etc.) ficavam cortados e o grid de cards forçava scroll
+   horizontal na tela toda, já que cada card exige no mínimo 380px de largura. */
+@media (max-width: 768px) {
+  .dashboard-actions-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .header-buttons {
+    flex-wrap: wrap;
+  }
+
+  .header-buttons button {
+    flex: 1 1 auto;
+  }
+
+  .tenants-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;

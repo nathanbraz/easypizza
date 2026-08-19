@@ -37,6 +37,9 @@
   gap: 16px;
   border-bottom: 1px solid var(--border-color);
   padding-bottom: 8px;
+  /* Em telas estreitas (ex: aba "Cupons" nas Configurações, que soma 4 abas) o conjunto de
+     abas rola horizontalmente em vez de cortar a última. */
+  overflow-x: auto;
 }
 
 .tab-btn {
@@ -47,6 +50,8 @@
   padding: 8px 16px;
   border-radius: var(--radius-sm);
   transition: var(--transition);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .tab-btn:hover {

@@ -314,8 +314,8 @@ export default function SettingsManager() {
       {activeTab === 'geral' && storeSettings && (
         <form className="settings-grid" onSubmit={handleUpdateSettings}>
           <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3>Configurações Gerais</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
+              <h3 style={{ border: 'none', margin: 0, padding: 0 }}>Configurações Gerais</h3>
               <button type="submit" className="btn-primary" disabled={savingSettings}>
                 {savingSettings ? 'Salvando...' : 'Salvar Alterações'}
               </button>
