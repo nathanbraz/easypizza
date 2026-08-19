@@ -18,7 +18,11 @@
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  /* 240px fazia as 4 colunas caberem por pouquíssima margem em telas como 1366px — bastava
+     faltar uns 6px pra grade cair pra 3 colunas e o 4º card quebrar sozinho pra outra linha,
+     esticando os outros 3 bem mais largos que o normal. 200px dá folga suficiente pras 4
+     caberem nas resoluções comuns de notebook, sem mudar nada no Full HD (que já sobrava espaço). */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1.5rem;
 }
 
