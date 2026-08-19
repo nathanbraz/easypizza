@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle, MessageCircle, Wallet } from 'lucide-react';
+import { Building2, Plus, Database, ExternalLink, RefreshCw, CheckCircle2, AlertTriangle, Ban, PlayCircle, MessageCircle } from 'lucide-react';
 import { api } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import './Tenants.css';
@@ -29,13 +29,6 @@ export default function TenantsDashboard() {
   const [whatsappModalTenant, setWhatsappModalTenant] = useState<Tenant | null>(null);
   const [whatsappApiKeyInput, setWhatsappApiKeyInput] = useState('');
   const [savingWhatsapp, setSavingWhatsapp] = useState(false);
-
-  // Modal de ambiente da credencial de pagamento (sandbox/produção) — saiu da tela do lojista
-  // porque só o Master sabe se o token colado é de teste ou de verdade (ver TenantsController).
-  const [paymentModalTenant, setPaymentModalTenant] = useState<Tenant | null>(null);
-  const [paymentSandboxInput, setPaymentSandboxInput] = useState(false);
-  const [loadingPaymentMode, setLoadingPaymentMode] = useState(false);
-  const [savingPayment, setSavingPayment] = useState(false);
 
   // Estado do Formulário
   const [name, setName] = useState('');
@@ -161,37 +154,6 @@ export default function TenantsDashboard() {
     }
   };
 
-  const handleOpenPaymentModal = async (tenant: Tenant) => {
-    setPaymentModalTenant(tenant);
-    setLoadingPaymentMode(true);
-    try {
-      const res = await api.get(`/master/tenants/${tenant.slug}/payment-sandbox-mode`);
-      setPaymentSandboxInput(!!res.data.paymentGatewaySandboxMode);
-    } catch (error: any) {
-      setFeedbackMsg({ text: error.response?.data?.message || "Erro ao consultar o ambiente de pagamento.", type: 'error' });
-      setPaymentModalTenant(null);
-    } finally {
-      setLoadingPaymentMode(false);
-    }
-  };
-
-  const handleSetPaymentSandboxMode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!paymentModalTenant) return;
-
-    setSavingPayment(true);
-    try {
-      await api.put(`/master/tenants/${paymentModalTenant.slug}/payment-sandbox-mode`, {
-        paymentGatewaySandboxMode: paymentSandboxInput
-      });
-      setFeedbackMsg({ text: `Ambiente de pagamento de "${paymentModalTenant.name}" atualizado.`, type: 'success' });
-      setPaymentModalTenant(null);
-    } catch (error: any) {
-      setFeedbackMsg({ text: error.response?.data?.message || "Erro ao salvar o ambiente de pagamento.", type: 'error' });
-    } finally {
-      setSavingPayment(false);
-    }
-  };
 
   const getTenantUrl = (tenantSlug: string, path: string = '') => {
     const hostname = window.location.hostname;
@@ -329,16 +291,6 @@ export default function TenantsDashboard() {
                     </button>
                   )}
 
-                  {hasPermission('Tenants:Edit') && (
-                    <button
-                      className="btn-secondary btn-sm"
-                      onClick={() => handleOpenPaymentModal(tenant)}
-                      title="Definir se a credencial de pagamento colada é de teste (sandbox) ou de produção"
-                    >
-                      <Wallet size={14} />
-                      <span>Pagamento</span>
-                    </button>
-                  )}
 
                   {hasPermission('Tenants:Block') && (
                     <button 
@@ -477,56 +429,6 @@ export default function TenantsDashboard() {
         </div>
       )}
 
-      {/* Modal Ambiente de Pagamento (sandbox/produção) */}
-      {paymentModalTenant && (
-        <div className="modal-overlay">
-          <div className="modal-content glass-panel">
-            <div className="modal-header">
-              <h3>Pagamento de "{paymentModalTenant.name}"</h3>
-              <button className="close-btn" onClick={() => setPaymentModalTenant(null)}>×</button>
-            </div>
-
-            <form onSubmit={handleSetPaymentSandboxMode}>
-              <div className="modal-notice">
-                <Wallet size={18} className="text-accent" />
-                <p>
-                  Precisa bater com o tipo de Access Token que o lojista colou em Configurações &gt;
-                  Pagamentos: sandbox e produção usam formato de e-mail de pagador diferente
-                  internamente — marcar errado quebra a geração do Pix.
-                </p>
-              </div>
-
-              {loadingPaymentMode ? (
-                <p className="form-hint">Consultando ambiente atual...</p>
-              ) : (
-                <div className="form-group">
-                  <label>Ambiente</label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '8px' }}>
-                    <label className="toggle-switch">
-                      <input
-                        type="checkbox"
-                        checked={paymentSandboxInput}
-                        onChange={(e) => setPaymentSandboxInput(e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                    <span>{paymentSandboxInput ? 'Sandbox (credencial de teste)' : 'Produção (credencial e dinheiro reais)'}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="modal-footer">
-                <button type="button" className="btn-secondary" onClick={() => setPaymentModalTenant(null)} disabled={savingPayment}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary" disabled={savingPayment || loadingPaymentMode}>
-                  {savingPayment ? 'Salvando...' : 'Salvar'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
