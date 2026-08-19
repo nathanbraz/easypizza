@@ -497,17 +497,12 @@ export default function SettingsManager() {
 
           {/* Card 2: Mensagens Automáticas */}
           <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Mensagem de Boas-Vindas & Cardápio Interativo</h3>
-                <p className="setting-desc" style={{ margin: '4px 0 0 0' }}>Mensagem enviada automaticamente quando o cliente envia um "Oi" ou manda mensagem pela primeira vez.</p>
-              </div>
-              <button type="submit" className="btn-primary" disabled={savingSettings} style={{ padding: '12px 24px', fontWeight: 'bold' }}>
-                {savingSettings ? 'Salvando...' : 'Salvar Alterações de WhatsApp'}
-              </button>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'white' }}>Mensagem de Boas-Vindas & Cardápio Interativo</h3>
+              <p className="setting-desc" style={{ margin: '4px 0 0 0' }}>Mensagem enviada automaticamente quando o cliente envia um "Oi" ou manda mensagem pela primeira vez.</p>
             </div>
 
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', marginTop: '16px' }}>
               <textarea
                 name="whatsappGreetingMessage"
                 defaultValue={storeSettings.whatsappGreetingMessage || ''}
@@ -516,6 +511,14 @@ export default function SettingsManager() {
                 placeholder="Olá! Bem-vindo(a)... Digite 1 para Cardápio ou 2 para Atendente"
               />
             </div>
+          </div>
+
+          {/* Barra de ação única pra aba inteira — os dois cards acima fazem parte do mesmo form,
+              esse botão não é exclusivo do card de Mensagens (ver handleUpdateWhatsappSettings). */}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="submit" className="btn-primary" disabled={savingSettings} style={{ padding: '12px 24px', fontWeight: 'bold' }}>
+              {savingSettings ? 'Salvando...' : 'Salvar Alterações de WhatsApp'}
+            </button>
           </div>
         </form>
       )}
