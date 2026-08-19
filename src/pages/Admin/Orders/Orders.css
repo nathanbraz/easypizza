@@ -44,6 +44,12 @@
   padding: 4px 8px 16px 8px; /* Adds horizontal padding to prevent border/shadow clipping */
 }
 
+/* Barra de abas pra alternar de coluna — só existe visualmente no celular (ver media query
+   no final do arquivo). No desktop fica com display: none, as colunas já aparecem todas juntas. */
+.kds-mobile-tabs {
+  display: none;
+}
+
 .kanban-column {
   flex: 1;
   min-width: 300px;
@@ -604,5 +610,62 @@
 
 .btn-close-modal:hover {
   background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Abaixo de ~768px (celular/tablet estreito), 4 colunas lado a lado não cabem de forma legível
+   — troca pra ver uma coluna por vez, alternando pela barra de abas do topo (.kds-mobile-tabs).
+   Fica no FINAL do arquivo de propósito: as regras de .kanban-column lá em cima também definem
+   display/min-width sem estarem dentro de media query nenhuma, e em empate de especificidade
+   quem vem depois no arquivo vence — colocando aqui por último garante que essas regras sempre
+   prevaleçam no celular, não importa a ordem em que o resto do arquivo mudar no futuro. */
+@media (max-width: 768px) {
+  .kds-mobile-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 12px 2px;
+    margin-bottom: 4px;
+    flex-shrink: 0;
+  }
+
+  .kds-mobile-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    background-color: var(--kds-chip-bg);
+    border: 1px solid var(--kds-card-border);
+    color: var(--kds-text-secondary);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    transition: var(--transition-fast);
+    white-space: nowrap;
+  }
+
+  .kds-mobile-tab.active {
+    background-color: color-mix(in srgb, var(--col-color) 18%, transparent);
+    border-color: var(--col-color);
+    color: var(--kds-text-primary);
+  }
+
+  .kds-kanban {
+    /* No desktop cada coluna tem min-width:300px lado a lado com scroll horizontal; no celular
+       vira uma única coluna cheia por vez, sem scroll horizontal nenhum (só vertical). */
+    overflow-x: hidden;
+  }
+
+  .kanban-column {
+    display: none !important;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .kanban-column.kds-mobile-active {
+    display: flex !important;
+  }
 }
 

@@ -72,6 +72,9 @@ export default function OrdersDashboard() {
   const [cancelingOrder, setCancelingOrder] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelSubmitting, setCancelSubmitting] = useState(false);
+  // Só tem efeito visual em tela estreita (ver Orders.css) — no desktop todas as colunas
+  // continuam visíveis ao mesmo tempo, esse estado só decide qual aba fica "ativa" no celular.
+  const [activeColumn, setActiveColumn] = useState<ColumnStatus>('new');
   const [sortDirections, setSortDirections] = useState<Record<ColumnStatus, 'asc' | 'desc'>>({
     new: 'asc',
     preparing: 'asc',
@@ -397,14 +400,32 @@ export default function OrdersDashboard() {
         </button>
       </header>
       
+      {/* Só aparece em tela estreita (ver .kds-mobile-tabs no CSS) — no desktop as colunas já
+          ficam todas visíveis lado a lado, essa barra não faz sentido lá. */}
+      <div className="kds-mobile-tabs">
+        {columns.map(col => (
+          <button
+            key={col.id}
+            className={`kds-mobile-tab ${activeColumn === col.id ? 'active' : ''}`}
+            style={{ '--col-color': col.color } as React.CSSProperties}
+            onClick={() => setActiveColumn(col.id)}
+          >
+            {col.title}
+            <span className="kanban-badge" style={{ backgroundColor: `${col.color}20`, color: col.color, border: `1px solid ${col.color}40` }}>
+              {getOrdersByColumn(col.id).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <div className="kds-kanban">
         {columns.map(col => {
           const colOrders = getOrdersByColumn(col.id);
           return (
-            <div 
-              key={col.id} 
-              className="kanban-column glass-panel"
-              style={{ 
+            <div
+              key={col.id}
+              className={`kanban-column glass-panel ${activeColumn === col.id ? 'kds-mobile-active' : ''}`}
+              style={{
                 borderTop: `3px solid ${col.color}`, 
                 boxShadow: `0 -4px 20px -10px ${col.color}`,
                 '--col-color': col.color 
