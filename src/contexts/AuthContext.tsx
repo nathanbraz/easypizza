@@ -37,12 +37,36 @@ function decodePermissionsFromToken(token: string): string[] {
   }
 }
 
+/**
+ * Sem isso, um token vencido guardado de uma sessão antiga era restaurado do localStorage
+ * de forma otimista: a tela protegida chegava a renderizar por alguns segundos até a primeira
+ * chamada à API voltar com 401 e só então redirecionar pro login. Checando o "exp" do JWT aqui
+ * evita esse flash, indo direto pro login sem nunca montar a tela.
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const payload = JSON.parse(atob(payloadBase64));
+    if (!payload.exp) return false;
+    return Date.now() >= payload.exp * 1000;
+  } catch {
+    return true;
+  }
+}
+
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(() => {
     const storedUser = localStorage.getItem('@EasyPizza:User');
     const storedToken = localStorage.getItem(STAFF_TOKEN_KEY);
+
+    if (storedToken && isTokenExpired(storedToken)) {
+      localStorage.removeItem(STAFF_TOKEN_KEY);
+      localStorage.removeItem('@EasyPizza:User');
+      return null;
+    }
+
     if (storedUser && storedToken) {
       try {
         const parsed = JSON.parse(storedUser);
