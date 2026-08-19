@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, CheckCircle, ChefHat, Bike, FileCheck, AlertCircle, RefreshCw, XCircle, RotateCcw, QrCode, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Clock, CheckCircle, ChefHat, Bike, FileCheck, AlertCircle, RefreshCw, XCircle, RotateCcw, Copy, Check } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { api, getTenantSlugFromUrl } from '../../lib/api';
+import PixStatusIcon from '../../components/PixStatusIcon';
 import './OrderTrackerPage.css';
 import { formatCurrency } from '../../utils/formatCurrency';
 
@@ -212,50 +213,47 @@ export default function OrderTrackerPage() {
                   </div>
                 )}
 
-                {order.paymentType?.isOnlinePayment && order.isPaid && (
-                  <div className="payment-approved-banner animate-slide-up">
-                    <CheckCircle size={32} color="#22c55e" style={{ flexShrink: 0 }} />
-                    <div className="approval-banner-info">
-                      <h3 style={{ color: '#22c55e' }}>Pagamento Aprovado</h3>
-                      <p>Recebemos a confirmação do seu pagamento via Pix. Seu pedido já está sendo preparado!</p>
-                    </div>
-                  </div>
-                )}
-
-                {order.paymentType?.isOnlinePayment && !order.isPaid && order.pixCopyPasteCode && (
-                  <div className="pix-payment-card glass-panel animate-slide-up">
+                {order.paymentType?.isOnlinePayment && (order.isPaid || order.pixCopyPasteCode) && (
+                  <div className={`pix-payment-card glass-panel animate-slide-up ${order.isPaid ? 'is-paid' : ''}`}>
                     <div className="pix-payment-header">
-                      <QrCode size={26} color="var(--primary)" />
+                      <PixStatusIcon status={order.isPaid ? 'confirmed' : 'waiting'} size={48} />
                       <div>
-                        <h3>Pague com Pix para confirmar seu pedido</h3>
-                        <p>Escaneie o QR code ou copie o código abaixo no app do seu banco. A confirmação é automática, não precisa recarregar a página.</p>
+                        <h3>{order.isPaid ? 'Pagamento Aprovado' : 'Pague com Pix para confirmar seu pedido'}</h3>
+                        <p>
+                          {order.isPaid
+                            ? 'Recebemos a confirmação do seu pagamento via Pix. Seu pedido já está sendo preparado!'
+                            : 'Escaneie o QR code ou copie o código abaixo no app do seu banco. A confirmação é automática, não precisa recarregar a página.'}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="pix-qr-wrapper">
-                      <QRCodeSVG value={order.pixCopyPasteCode} size={180} />
-                    </div>
+                    {!order.isPaid && (
+                      <>
+                        <div className="pix-qr-wrapper">
+                          <QRCodeSVG value={order.pixCopyPasteCode} size={180} />
+                        </div>
 
-                    <div className="pix-copy-row">
-                      <input type="text" readOnly value={order.pixCopyPasteCode} className="pix-copy-input" />
-                      <button
-                        type="button"
-                        className="pix-copy-btn"
-                        onClick={() => {
-                          navigator.clipboard.writeText(order.pixCopyPasteCode);
-                          setPixCopied(true);
-                          setTimeout(() => setPixCopied(false), 2500);
-                        }}
-                      >
-                        {pixCopied ? <Check size={16} /> : <Copy size={16} />}
-                        {pixCopied ? 'Copiado!' : 'Copiar código'}
-                      </button>
-                    </div>
+                        <div className="pix-copy-row">
+                          <input type="text" readOnly value={order.pixCopyPasteCode} className="pix-copy-input" />
+                          <button
+                            type="button"
+                            className="pix-copy-btn"
+                            onClick={() => {
+                              navigator.clipboard.writeText(order.pixCopyPasteCode);
+                              setPixCopied(true);
+                              setTimeout(() => setPixCopied(false), 2500);
+                            }}
+                          >
+                            {pixCopied ? <Check size={16} /> : <Copy size={16} />}
+                            {pixCopied ? 'Copiado!' : 'Copiar código'}
+                          </button>
+                        </div>
 
-                    <div className="pix-waiting-indicator">
-                      <span className="pix-waiting-spinner" />
-                      Aguardando confirmação do pagamento...
-                    </div>
+                        <div className="pix-waiting-indicator">
+                          Aguardando confirmação do pagamento...
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
