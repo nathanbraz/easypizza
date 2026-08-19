@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Edit2, X, Check, XCircle, Image as ImageIcon, Copy } from 'lucide-react';
+import { Plus, Edit2, X, Check, XCircle, Image as ImageIcon, Copy, Eye, EyeOff } from 'lucide-react';
 import { api, getTenantSlugFromUrl } from '../../../lib/api';
 import { useLockBodyScroll } from '../../../hooks/useLockBodyScroll';
 import '../Catalog/Catalog.css';
@@ -27,6 +27,11 @@ export default function SettingsManager() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
+  // Access Token e Chave de Webhook vêm preenchidos com o valor real (ver SettingsController),
+  // mas ficam ocultos (type="password") até o lojista clicar pra revelar.
+  const [showAccessToken, setShowAccessToken] = useState(false);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+
   // Estado dos Cupons
   const [coupons, setCoupons] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,8 +51,9 @@ export default function SettingsManager() {
 
   const loadSettings = async () => {
     try {
-      // Rota autenticada (não a pública do cardápio) — só ela traz os indicadores
-      // hasWhatsappApiKey/hasPaymentGatewayAccessToken; as credenciais em si nunca voltam pro navegador.
+      // Rota autenticada (não a pública do cardápio) — só ela traz o indicador hasWhatsappApiKey
+      // (só o Master define/vê essa credencial) e os valores reais de Access Token/Chave de
+      // Webhook do gateway de pagamento (o lojista é dono dessa credencial).
       const res = await api.get('/settings/admin');
       setStoreSettings(res.data.storeSettings);
       setPaymentTypes(res.data.paymentTypes);
@@ -163,12 +169,12 @@ export default function SettingsManager() {
     const formData = new FormData(e.currentTarget);
 
     // Em branco = manter o token já salvo (o backend trata string vazia/nula como "não mudou" —
-    // ver SettingsController.UpdateSettings). O campo nunca vem preenchido com o valor real.
+    // ver SettingsController.UpdateSettings). Os campos já vêm preenchidos com o valor real
+    // (ocultos por padrão, com opção de revelar), então isso só importa se o lojista apagar tudo.
     const payload = {
       ...storeSettings,
       paymentGatewayAccessToken: formData.get('paymentGatewayAccessToken')?.toString() || null,
       paymentGatewayWebhookSecret: formData.get('paymentGatewayWebhookSecret')?.toString() || null,
-      paymentGatewaySandboxMode: formData.get('paymentGatewaySandboxMode') === 'on'
     };
 
     try {
@@ -176,7 +182,6 @@ export default function SettingsManager() {
       await api.put('/settings', payload);
       alert('Configurações de pagamento salvas com sucesso!');
       loadSettings();
-      (e.target as HTMLFormElement).reset();
     } catch (error) {
       console.error(error);
       alert('Erro ao salvar configurações de pagamento.');
@@ -528,44 +533,52 @@ export default function SettingsManager() {
               </button>
             </div>
 
-            <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', marginBottom: '24px', padding: '14px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.2)' }}>
-              <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Ambiente</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px' }}>
-                <label className="toggle-switch">
-                  <input type="checkbox" name="paymentGatewaySandboxMode" defaultChecked={storeSettings.paymentGatewaySandboxMode} />
-                  <span className="slider"></span>
-                </label>
-                <span className="setting-desc">Marcado = Sandbox (credencial de teste). Desmarcado = Produção (credencial e dinheiro reais).</span>
-              </div>
-              <span className="setting-desc" style={{ marginTop: '6px' }}>
-                Precisa bater com o tipo de Access Token colado abaixo — sandbox e produção usam formato de e-mail de pagador diferente internamente, marcar errado quebra a geração do Pix.
-              </span>
-            </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
               <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                 <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Access Token</label>
-                <input
-                  type="password"
-                  name="paymentGatewayAccessToken"
-                  placeholder={storeSettings.hasPaymentGatewayAccessToken ? '•••••••• (já configurado — deixe em branco pra manter)' : 'Cole aqui o Access Token (TEST-... ou APP_USR-...)'}
-                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
-                />
+                <div style={{ position: 'relative', width: '100%', marginTop: '8px' }}>
+                  <input
+                    type={showAccessToken ? 'text' : 'password'}
+                    name="paymentGatewayAccessToken"
+                    defaultValue={storeSettings.paymentGatewayAccessToken || ''}
+                    placeholder="Cole aqui o Access Token (TEST-... ou APP_USR-...)"
+                    style={{ width: '100%', padding: '10px 44px 10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAccessToken(v => !v)}
+                    title={showAccessToken ? 'Ocultar' : 'Revelar'}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
+                  >
+                    {showAccessToken ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
                 <span className="setting-desc" style={{ marginTop: '6px' }}>
-                  {storeSettings.hasPaymentGatewayAccessToken
-                    ? `Configurado (${storeSettings.paymentGatewayProvider === 'MercadoPago' ? 'Mercado Pago' : storeSettings.paymentGatewayProvider || 'gateway'}). Só é possível trocá-lo, não visualizá-lo novamente.`
+                  {storeSettings.paymentGatewayAccessToken
+                    ? `Configurado (${storeSettings.paymentGatewayProvider === 'MercadoPago' ? 'Mercado Pago' : storeSettings.paymentGatewayProvider || 'gateway'}).`
                     : 'Encontrado em developers.mercadopago.com.br, na aplicação da loja, aba Credenciais.'}
                 </span>
               </div>
 
               <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                 <label style={{ fontWeight: '600', color: '#e2e8f0' }}>Chave Secreta do Webhook</label>
-                <input
-                  type="password"
-                  name="paymentGatewayWebhookSecret"
-                  placeholder={storeSettings.hasPaymentGatewayWebhookSecret ? '•••••••• (já configurada — deixe em branco pra manter)' : 'Cole aqui a Chave secreta em Webhooks'}
-                  style={{ marginTop: '8px', width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
-                />
+                <div style={{ position: 'relative', width: '100%', marginTop: '8px' }}>
+                  <input
+                    type={showWebhookSecret ? 'text' : 'password'}
+                    name="paymentGatewayWebhookSecret"
+                    defaultValue={storeSettings.paymentGatewayWebhookSecret || ''}
+                    placeholder="Cole aqui a Chave secreta em Webhooks"
+                    style={{ width: '100%', padding: '10px 44px 10px 14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.15)', background: 'rgba(0,0,0,0.3)', color: 'white' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowWebhookSecret(v => !v)}
+                    title={showWebhookSecret ? 'Ocultar' : 'Revelar'}
+                    style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', color: 'var(--text-secondary)', padding: '4px', display: 'flex' }}
+                  >
+                    {showWebhookSecret ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </div>
                 <span className="setting-desc" style={{ marginTop: '6px' }}>
                   Usada para confirmar que a notificação de pagamento realmente veio do Mercado Pago. Sem ela, nenhuma confirmação automática é aceita.
                 </span>
