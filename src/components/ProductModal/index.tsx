@@ -228,7 +228,10 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       return;
     }
 
-    // Add the second half as a pseudo-option so it appears in the cart and backend
+    // Pseudo-opção "Meio a Meio" só pra aparecer no carrinho (nome, imagem, preço estimado) — o
+    // pedido de verdade manda o id do produto da 2ª metade separado (secondHalfProductId, abaixo),
+    // já que não existe opção de catálogo real pra "metade de pizza" pra validar contra. O backend
+    // recalcula esse preço do zero a partir do catálogo, nunca confia neste valor aqui.
     const finalSelectedOptions = [...selectedOptionObjects];
     if (isHalfAndHalf && secondHalfProductObj) {
       finalSelectedOptions.push({
@@ -247,7 +250,8 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       selectedDrinks,
       observation,
       quantity,
-      finalPrice: finalTotal
+      finalPrice: finalTotal,
+      secondHalfProductId: (isHalfAndHalf && secondHalfProductObj) ? secondHalfProductObj.id : null
     };
     onAddToCart(finalItem);
     onClose();

@@ -171,9 +171,14 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
         quantity: item.quantity,
         unitPrice: item.finalPrice / item.quantity,
         notes: item.observation || null,
+        // Pizza Meio a Meio vai num campo próprio, não como addon — ela não tem
+        // productOptionItemId real pra validar (ver ProductModal), o backend recalcula o preço
+        // sozinho a partir do id do produto da 2ª metade.
+        secondHalfProductId: item.secondHalfProductId || null,
         addons: [
-          // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.)
-          ...(item.selectedOptions?.map((opt: any) => ({
+          // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.) — a pseudo-opção
+          // "Meio a Meio" fica de fora daqui (só existe pra exibição no carrinho, ver acima).
+          ...(item.selectedOptions?.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any) => ({
             productOptionItemId: opt.id || null,
             addonName: opt.name,
             price: opt.additionalPrice || 0,
