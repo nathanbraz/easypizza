@@ -6,15 +6,25 @@ import { formatCurrency } from '../../../utils/formatCurrency';
 
 interface CategoryOptionsModalProps {
   category: any;
+  // Produtos já cadastrados nesta categoria — usados só pra montar o seletor de sabores quando o
+  // grupo ativo é o de Sabores (o item aponta pra um Produto real, não é digitado à mão).
+  categoryProducts: any[];
   tenantSlug: string;
   onClose: () => void;
 }
+
+const FLAVOR_STRATEGIES = [
+  { value: 0, label: 'Mais caro', hint: 'Cobra o preço do sabor mais caro escolhido' },
+  { value: 1, label: 'Soma', hint: 'Soma o preço de cada sabor escolhido' },
+  { value: 2, label: 'Média', hint: 'Faz a média entre os sabores escolhidos' },
+  { value: 3, label: 'Mais barato', hint: 'Cobra o preço do sabor mais barato escolhido' }
+];
 
 // Gerencia os grupos/itens compartilhados por TODA a categoria (Tamanho, Borda). Diferente das
 // "Opções do Produto" (Adicionais extras), essas definições existem uma única vez por categoria —
 // cada produto só escolhe quais itens oferece e a que preço (isso é feito no modal de opções do
 // próprio produto, não aqui).
-export default function CategoryOptionsModal({ category, tenantSlug, onClose }: CategoryOptionsModalProps) {
+export default function CategoryOptionsModal({ category, categoryProducts, tenantSlug, onClose }: CategoryOptionsModalProps) {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,6 +35,8 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
   const [groupMax, setGroupMax] = useState(1);
   const [groupDisplayOrder, setGroupDisplayOrder] = useState(0);
   const [groupHasUniformPricing, setGroupHasUniformPricing] = useState(false);
+  const [groupIsFlavorGroup, setGroupIsFlavorGroup] = useState(false);
+  const [groupFlavorPriceStrategy, setGroupFlavorPriceStrategy] = useState(0);
 
   const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   const [isItemFormOpen, setIsItemFormOpen] = useState(false);
@@ -32,6 +44,7 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
   const [itemName, setItemName] = useState('');
   const [itemDisplayOrder, setItemDisplayOrder] = useState(0);
   const [itemUniformPrice, setItemUniformPrice] = useState('0');
+  const [itemProductId, setItemProductId] = useState('');
 
   // Grupo dono do item que está sendo criado/editado no momento — usado só pra saber se mostra o
   // campo de preço uniforme no formulário do item (só faz sentido se o grupo for de preço uniforme).
@@ -62,12 +75,26 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
     setGroupMax(group ? group.maxChoices : 1);
     setGroupDisplayOrder(group?.displayOrder || 0);
     setGroupHasUniformPricing(group?.hasUniformPricing || false);
+    setGroupIsFlavorGroup(group?.isFlavorGroup || false);
+    setGroupFlavorPriceStrategy(group?.flavorPriceStrategy ?? 0);
     setIsGroupFormOpen(true);
   };
 
+  // Só pode existir um grupo de Sabores por categoria (o mesmo produto não pode aparecer como
+  // sabor extra em dois grupos diferentes — o backend também valida isso).
+  const hasOtherFlavorGroup = groups.some(g => g.isFlavorGroup && g.id !== editingGroup?.id);
+
   const saveGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { name: groupName, minChoices: groupMin, maxChoices: groupMax, displayOrder: groupDisplayOrder, hasUniformPricing: groupHasUniformPricing };
+    const payload = {
+      name: groupName,
+      minChoices: groupMin,
+      maxChoices: groupMax,
+      displayOrder: groupDisplayOrder,
+      hasUniformPricing: groupIsFlavorGroup ? false : groupHasUniformPricing,
+      isFlavorGroup: groupIsFlavorGroup,
+      flavorPriceStrategy: groupFlavorPriceStrategy
+    };
 
     try {
       if (editingGroup) {
@@ -98,16 +125,25 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
     setItemName(item?.name || '');
     setItemDisplayOrder(item?.displayOrder || 0);
     setItemUniformPrice(item ? String(item.uniformPrice ?? 0) : '0');
+    setItemProductId(item?.productId || '');
     setIsItemFormOpen(true);
   };
 
   const saveItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeGroupId) return;
+
+    const linkedProduct = activeGroup?.isFlavorGroup ? categoryProducts.find(p => p.id === itemProductId) : null;
+    if (activeGroup?.isFlavorGroup && !linkedProduct) {
+      alert('Escolha um produto para representar o sabor.');
+      return;
+    }
+
     const payload = {
-      name: itemName,
+      name: activeGroup?.isFlavorGroup ? linkedProduct!.name : itemName,
       displayOrder: itemDisplayOrder,
-      uniformPrice: activeGroup?.hasUniformPricing ? (parseFloat(itemUniformPrice.replace(',', '.')) || 0) : null
+      uniformPrice: activeGroup?.hasUniformPricing ? (parseFloat(itemUniformPrice.replace(',', '.')) || 0) : null,
+      productId: activeGroup?.isFlavorGroup ? itemProductId : null
     };
 
     try {
@@ -179,10 +215,16 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
                             Preço uniforme
                           </span>
                         )}
+                        {g.isFlavorGroup && (
+                          <span style={{ fontSize: '11px', fontWeight: 600, color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>
+                            🌗 Sabores ({FLAVOR_STRATEGIES.find(s => s.value === g.flavorPriceStrategy)?.label})
+                          </span>
+                        )}
                       </h4>
                       <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
                         O cliente escolhe entre {g.minChoices} e {g.maxChoices} opção(ões)
                         {g.hasUniformPricing && ' • mesmo preço em todos os produtos'}
+                        {g.isFlavorGroup && ' sabor(es) extra(s) — habilita o Meio a Meio nesta categoria'}
                       </p>
                     </div>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -260,18 +302,43 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
                 <label style={{ fontSize: '12px' }}>Ordem de Exibição</label>
                 <input type="number" className="form-input" value={groupDisplayOrder} onChange={e => setGroupDisplayOrder(parseInt(e.target.value))} required />
               </div>
+              {!groupIsFlavorGroup && (
+                <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <label style={{ margin: 0 }}>Preço uniforme entre produtos?</label>
+                    <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                      Ative se o preço de cada opção é sempre o mesmo, não importa o produto (ex: Borda). Você define o preço uma vez aqui, e cada produto só liga/desliga se oferece. Desative se o preço varia por produto (ex: Tamanho).
+                    </span>
+                  </div>
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={groupHasUniformPricing} onChange={(e) => setGroupHasUniformPricing(e.target.checked)} />
+                    <span className="slider"></span>
+                  </label>
+                </div>
+              )}
               <div className="form-group" style={{ margin: 0, display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  <label style={{ margin: 0 }}>Preço uniforme entre produtos?</label>
+                  <label style={{ margin: 0 }}>É o grupo de Sabores?</label>
                   <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                    Ative se o preço de cada opção é sempre o mesmo, não importa o produto (ex: Borda). Você define o preço uma vez aqui, e cada produto só liga/desliga se oferece. Desative se o preço varia por produto (ex: Tamanho).
+                    Ative pra este ser o grupo que habilita "Meio a Meio" nesta categoria — os itens dele apontam pra produtos já cadastrados (não digita nome/preço). Só um grupo de Sabores por categoria.
                   </span>
+                  {hasOtherFlavorGroup && (
+                    <span style={{ fontSize: '12px', color: '#ef4444' }}>Esta categoria já tem um grupo de Sabores ({groups.find(g => g.isFlavorGroup)?.name}).</span>
+                  )}
                 </div>
                 <label className="toggle-switch">
-                  <input type="checkbox" checked={groupHasUniformPricing} onChange={(e) => setGroupHasUniformPricing(e.target.checked)} />
+                  <input type="checkbox" checked={groupIsFlavorGroup} disabled={hasOtherFlavorGroup} onChange={(e) => setGroupIsFlavorGroup(e.target.checked)} />
                   <span className="slider"></span>
                 </label>
               </div>
+              {groupIsFlavorGroup && (
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '12px' }}>Como calcular o preço da combinação?</label>
+                  <select className="form-input" value={groupFlavorPriceStrategy} onChange={(e) => setGroupFlavorPriceStrategy(parseInt(e.target.value))}>
+                    {FLAVOR_STRATEGIES.map(s => <option key={s.value} value={s.value}>{s.label} — {s.hint}</option>)}
+                  </select>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '8px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setIsGroupFormOpen(false)}>Cancelar</button>
                 <button type="submit" className="btn-primary">Salvar Grupo</button>
@@ -287,15 +354,30 @@ export default function CategoryOptionsModal({ category, tenantSlug, onClose }: 
             <button className="modal-close" style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }} onClick={() => setIsItemFormOpen(false)}><X size={20} /></button>
             <h3 style={{ marginTop: 0, paddingRight: '24px' }}>{editingItem ? 'Editar Opção' : 'Nova Opção'}</h3>
             <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>
-              {activeGroup?.hasUniformPricing
+              {activeGroup?.isFlavorGroup
+                ? 'Escolha qual produto já cadastrado nesta categoria representa este sabor — nome e foto seguem o produto escolhido.'
+                : activeGroup?.hasUniformPricing
                 ? 'Este grupo tem preço uniforme — o preço definido aqui vale pra todo produto que oferecer esta opção.'
                 : 'O preço fica a cargo de cada produto (defina em "Gerenciar Opções" no produto).'}
             </p>
             <form onSubmit={saveItem} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div className="form-group">
-                <label>Nome da Opção</label>
-                <input type="text" className="form-input" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="Ex: G (8 fatias)" required />
-              </div>
+              {activeGroup?.isFlavorGroup ? (
+                <div className="form-group">
+                  <label>Produto (sabor)</label>
+                  <select className="form-input" value={itemProductId} onChange={e => setItemProductId(e.target.value)} required>
+                    <option value="" disabled>Selecione um produto...</option>
+                    {categoryProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  {categoryProducts.length === 0 && (
+                    <span style={{ fontSize: '12px', color: '#ef4444' }}>Nenhum produto cadastrado nesta categoria ainda.</span>
+                  )}
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label>Nome da Opção</label>
+                  <input type="text" className="form-input" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="Ex: G (8 fatias)" required />
+                </div>
+              )}
               {activeGroup?.hasUniformPricing && (
                 <div className="form-group">
                   <label>Preço</label>

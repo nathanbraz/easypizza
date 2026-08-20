@@ -283,7 +283,7 @@ export default function MenuPage() {
                 {category.products && category.products.map((product: Product, index: number) => (
                   <ProductCard
                     key={product.id}
-                    product={{ ...product, categoryName: category.name, categoryId: category.id, allowsHalfAndHalf: category.allowsHalfAndHalf, addons: category.addons }}
+                    product={{ ...product, categoryName: category.name, categoryId: category.id, addons: category.addons }}
                     onAdd={handleOpenModal}
                     delay={index * 0.1}
                   />

@@ -55,8 +55,6 @@ export default function CatalogManager() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   
-  // Estado para Categorias
-  const [allowsHalfAndHalf, setAllowsHalfAndHalf] = useState<boolean>(false);
   const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
@@ -123,8 +121,6 @@ export default function CatalogManager() {
       setIsAvailable(item ? item.isAvailable : true);
       setShowInCrossSell(item ? item.showInCrossSell : false);
       setCrossSellDiscountPrice(item?.crossSellDiscountPrice != null ? String(item.crossSellDiscountPrice) : '');
-    } else if (activeTab === 'categorias') {
-      setAllowsHalfAndHalf(item ? item.allowsHalfAndHalf : false);
     }
 
     
@@ -189,8 +185,7 @@ export default function CatalogManager() {
       if (activeTab === 'categorias') {
         const payload = {
           name: itemName,
-          displayOrder: parseInt(formData.get('displayOrder') as string) || 0,
-          allowsHalfAndHalf
+          displayOrder: parseInt(formData.get('displayOrder') as string) || 0
         };
         if (editingItem) await api.put(`/categories/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/categories/${tenantSlug}`, payload);
@@ -365,27 +360,10 @@ export default function CatalogManager() {
               </div>
 
               {activeTab === 'categorias' && (
-                <>
-                  <div className="form-group">
-                    <label>Ordem de Exibição</label>
-                    <input type="number" name="displayOrder" defaultValue={editingItem?.displayOrder || 0} required className="form-input" />
-                  </div>
-                  
-                  <div className="form-group" style={{ marginTop: '8px', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={{ margin: 0 }}>Permitir "Meio a Meio"?</label>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ative para produtos como Pizza, onde o cliente pode dividir sabores.</span>
-                    </div>
-                    <label className="toggle-switch">
-                      <input 
-                        type="checkbox" 
-                        checked={allowsHalfAndHalf}
-                        onChange={(e) => setAllowsHalfAndHalf(e.target.checked)}
-                      />
-                      <span className="slider"></span>
-                    </label>
-                  </div>
-                </>
+                <div className="form-group">
+                  <label>Ordem de Exibição</label>
+                  <input type="number" name="displayOrder" defaultValue={editingItem?.displayOrder || 0} required className="form-input" />
+                </div>
               )}
 
               {activeTab === 'produtos' && (
@@ -656,6 +634,7 @@ export default function CatalogManager() {
       {isCategoryOptionsModalOpen && selectedCategoryForOptions && (
         <CategoryOptionsModal
           category={selectedCategoryForOptions}
+          categoryProducts={products.filter((p: any) => p.categoryId === selectedCategoryForOptions.id)}
           tenantSlug={tenantSlug}
           onClose={() => {
             setIsCategoryOptionsModalOpen(false);

@@ -1,14 +1,14 @@
-import { useState, useRef } from 'react';
-import { X, Plus, Minus, Search, CheckCircle2 } from 'lucide-react';
+import { useState } from 'react';
+import { X, Plus, Minus } from 'lucide-react';
 import { useLockBodyScroll } from '../../hooks/useLockBodyScroll';
 import './ProductModal.css';
 import { formatCurrency } from '../../utils/formatCurrency';
 
-import type { Product } from '../../types';
+import type { Product, ProductOptionGroup } from '../../types';
 
 interface ProductModalProps {
   product: Product;
-  availableProducts: Product[]; // All products from the API (for half/half and drinks)
+  availableProducts: Product[]; // Todos os produtos da API (pra resolver os sabores do grupo de Sabores)
   onClose: () => void;
   onAddToCart: (item: any) => void;
 }
@@ -16,19 +16,27 @@ interface ProductModalProps {
 export default function ProductModal({ product, availableProducts, onClose, onAddToCart }: ProductModalProps) {
   // As opções do produto já vêm prontas em `product.optionGroups` — o mesmo GET /menu/{tenantSlug}
   // que carregou o cardápio já mescla os grupos próprios (Adicionais extras) com os compartilhados
-  // da categoria (Tamanho, Borda), com o preço correto para ESTE produto. Não precisa de fetch aqui.
-  const optionGroups: any[] = product.optionGroups || [];
+  // da categoria (Tamanho, Borda, Sabores), com o preço correto para ESTE produto. Não precisa de fetch aqui.
+  const optionGroups: ProductOptionGroup[] = product.optionGroups || [];
 
   // Tamanho/Borda (isShared) são propriedades da pizza inteira, únicas por categoria — usamos o
   // MESMO id em qualquer produto da categoria, então dá pra comparar/combinar entre sabores por id,
   // sem depender de casar nomes de texto (era isso que causava o bug do meio a meio antigo).
-  const sharedGroups = optionGroups.filter((g: any) => g.isShared);
-  const ownGroups = optionGroups.filter((g: any) => !g.isShared);
+  const sharedGroups = optionGroups.filter((g) => g.isShared);
+  const ownGroups = optionGroups.filter((g) => !g.isShared);
+
+  // Meio a Meio (Sabores): generalizado como só mais um grupo compartilhado da categoria — cada
+  // item nele referencia um Produto-sabor real (linkedProductId). Precisa ser tratado à parte só
+  // na hora de PREÇO (não entra na soma genérica de additionalPrice; o valor vem da estratégia de
+  // combinação da loja), mas a SELEÇÃO usa exatamente a mesma UI/estado que qualquer outro grupo.
+  const flavorGroup = sharedGroups.find((g) => g.isFlavorGroup);
+  const nonFlavorGroups = optionGroups.filter((g) => g.id !== flavorGroup?.id);
+  const nonFlavorSharedGroups = sharedGroups.filter((g) => g.id !== flavorGroup?.id);
 
   // State for radio/checkbox selections (key: groupId, value: array of itemIds)
   const [selections, setSelections] = useState<Record<string, string[]>>(() => {
     const initial: Record<string, string[]> = {};
-    optionGroups.forEach((g: any) => { initial[g.id] = []; });
+    optionGroups.forEach((g) => { initial[g.id] = []; });
     return initial;
   });
   // State for counter quantities (key: itemId, value: quantity number)
@@ -36,38 +44,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
 
   const [observation, setObservation] = useState('');
   const [quantity, setQuantity] = useState(1);
-
-  // Half and Half (Meio a Meio)
-  const [isHalfAndHalf, setIsHalfAndHalf] = useState(false);
-  const [secondHalfProductId, setSecondHalfProductId] = useState<string>('');
-  const [searchHalf, setSearchHalf] = useState('');
-
-  // Drag to scroll
-  const carouselRef = useRef<HTMLDivElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [startX, setStartX] = useState(0);
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [dragDist, setDragDist] = useState(0);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!carouselRef.current) return;
-    setIsDragging(true);
-    setDragDist(0);
-    setStartX(e.pageX - carouselRef.current.offsetLeft);
-    setScrollLeft(carouselRef.current.scrollLeft);
-  };
-
-  const handleMouseLeave = () => setIsDragging(false);
-  const handleMouseUp = () => setIsDragging(false);
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !carouselRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - carouselRef.current.offsetLeft;
-    const walk = (x - startX) * 2;
-    setDragDist(Math.abs(walk));
-    carouselRef.current.scrollLeft = scrollLeft - walk;
-  };
 
   useLockBodyScroll();
 
@@ -99,9 +75,9 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       const newQty = Math.max(0, currentQty + delta);
 
       // Calculate total items in this group
-      const group = optionGroups.find((g: any) => g.id === groupId);
+      const group = optionGroups.find((g) => g.id === groupId);
       if (!group) return prev;
-      const totalInGroup = group.options.reduce((sum: number, opt: any) => {
+      const totalInGroup = group.options.reduce((sum: number, opt) => {
         const qty = opt.id === itemId ? newQty : (prev[opt.id] || 0);
         return sum + qty;
       }, 0);
@@ -114,14 +90,16 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   // Pricing Logic
   const basePrice = product.price;
 
-  // Calculate total additional price from selected options (radio/checkbox)
+  // Calcula o total das opções normais (Tamanho, Borda, Adicionais) — o grupo de Sabores fica de
+  // fora dessa soma de propósito: o preço dele não é "por item", é o resultado da estratégia de
+  // combinação (ver flavorExtraPrice abaixo).
   let optionsTotal = 0;
   const selectedOptionObjects: any[] = [];
 
-  optionGroups.forEach((g: any) => {
+  nonFlavorGroups.forEach((g) => {
     if (g.groupType === 'counter') {
       // Counter groups: sum quantities
-      g.options.forEach((opt: any) => {
+      g.options.forEach((opt) => {
         const qty = counterQuantities[opt.id] || 0;
         if (qty > 0) {
           optionsTotal += (opt.additionalPrice || 0) * qty;
@@ -132,7 +110,7 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       // Radio/Checkbox groups
       const selectedIds = selections[g.id] || [];
       selectedIds.forEach((itemId: string) => {
-        const item = g.options.find((opt: any) => opt.id === itemId);
+        const item = g.options.find((opt) => opt.id === itemId);
         if (item) {
           optionsTotal += (item.additionalPrice || 0);
           selectedOptionObjects.push({ groupName: g.name, ...item, quantity: 1 });
@@ -141,77 +119,59 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     }
   });
 
-  // Um 2º sabor só pode ser combinado se oferecer TODAS as opções compartilhadas (Tamanho, Borda)
-  // já escolhidas no 1º sabor — evita "meio Tamanho G, meio Tamanho não-existe" ou bordas
-  // divididas por metade, que o lojista não faz (ver conversa sobre isso).
-  const candidateOffersCurrentSharedSelection = (candidate: any) => {
-    const candidateGroups: any[] = candidate.optionGroups || [];
-    return sharedGroups.every((g: any) => {
+  // Preço total que UM sabor cobraria sozinho, com as MESMAS opções compartilhadas (Tamanho,
+  // Borda) já escolhidas — usado pra aplicar a estratégia de combinação (mais caro/soma/média/mais
+  // barato) sobre o conjunto {sabor principal, sabores extras}. Só uma prévia: o backend sempre
+  // recalcula isso do zero a partir do catálogo, nunca confia neste valor.
+  const getFlavorTotal = (flavorProduct: Product) => {
+    const flavorGroups = flavorProduct.optionGroups || [];
+    let total = flavorProduct.price;
+    nonFlavorSharedGroups.forEach((g) => {
       const selectedIds = selections[g.id] || [];
-      if (selectedIds.length === 0) return true; // nada escolhido nesse grupo ainda, não restringe
-      const candidateGroup = candidateGroups.find((cg: any) => cg.id === g.id);
-      const candidateItemIds = new Set((candidateGroup?.options || []).map((o: any) => o.id));
-      return selectedIds.every((id: string) => candidateItemIds.has(id));
+      const matchingGroup = flavorGroups.find((fg) => fg.id === g.id);
+      selectedIds.forEach((itemId) => {
+        const opt = matchingGroup?.options.find((o) => o.id === itemId);
+        if (opt) total += (opt.additionalPrice || 0);
+      });
     });
+    return total;
   };
 
-  // Half and Half logic
-  let halfAndHalfExtraPrice = 0;
-  let secondHalfProductObj: any = null;
-  let secondHalfOptionGroups: any[] = [];
+  const selectedFlavorProducts = flavorGroup
+    ? (selections[flavorGroup.id] || [])
+        .map((itemId) => {
+          const item = flavorGroup.options.find((o) => o.id === itemId);
+          return item?.linkedProductId ? availableProducts.find((p) => p.id === item.linkedProductId) : null;
+        })
+        .filter((p): p is Product => !!p)
+    : [];
 
-  if (isHalfAndHalf && secondHalfProductId) {
-    secondHalfProductObj = availableProducts.find(p => p.id === secondHalfProductId) || null;
-    if (secondHalfProductObj) {
-      secondHalfOptionGroups = secondHalfProductObj.optionGroups || [];
-
-      // Para cada opção compartilhada escolhida (Tamanho, Borda), compara o preço que CADA sabor
-      // cobra pelo MESMO item (mesmo id) e cobra a diferença do mais caro — sem casar por nome.
-      sharedGroups.forEach((g: any) => {
-        const selectedIds = selections[g.id] || [];
-        selectedIds.forEach((itemId: string) => {
-          const mainOpt = g.options.find((o: any) => o.id === itemId);
-          const secondGroup = secondHalfOptionGroups.find((sg: any) => sg.id === g.id);
-          const secondOpt = secondGroup?.options.find((o: any) => o.id === itemId);
-          if (mainOpt && secondOpt) {
-            const diff = (secondOpt.additionalPrice || 0) - (mainOpt.additionalPrice || 0);
-            if (diff > 0) halfAndHalfExtraPrice += diff;
-          }
-        });
-      });
-
-      const baseDiff = secondHalfProductObj.price - basePrice;
-      if (baseDiff > 0) {
-        halfAndHalfExtraPrice += baseDiff;
-      }
-    }
+  let flavorExtraPrice = 0;
+  if (flavorGroup && selectedFlavorProducts.length > 0) {
+    const baseTotal = getFlavorTotal(product);
+    const allTotals = [baseTotal, ...selectedFlavorProducts.map(getFlavorTotal)];
+    const strategy = flavorGroup.flavorPriceStrategy;
+    let combinedTotal: number;
+    if (strategy === 'Soma' || strategy === 1) combinedTotal = allTotals.reduce((a, b) => a + b, 0);
+    else if (strategy === 'Media' || strategy === 2) combinedTotal = allTotals.reduce((a, b) => a + b, 0) / allTotals.length;
+    else if (strategy === 'MaisBarato' || strategy === 3) combinedTotal = Math.min(...allTotals);
+    else combinedTotal = Math.max(...allTotals); // MaisCaro (padrão)
+    flavorExtraPrice = Math.max(0, combinedTotal - baseTotal);
   }
 
-  // Uma vez que o 2º sabor está escolhido, as opções compartilhadas exibidas pro cliente se
-  // restringem à interseção do que os dois sabores oferecem — pra não deixar montar uma combinação
-  // que só um dos dois sabores suporta.
-  const getSharedGroupDisplayOptions = (group: any) => {
-    if (!isHalfAndHalf || !secondHalfProductObj) return group.options;
-    const secondGroup = secondHalfOptionGroups.find((sg: any) => sg.id === group.id);
-    const secondIds = new Set((secondGroup?.options || []).map((o: any) => o.id));
-    return group.options.filter((o: any) => secondIds.has(o.id));
-  };
-
-  const unitTotal = basePrice + optionsTotal + halfAndHalfExtraPrice;
+  const unitTotal = basePrice + optionsTotal + flavorExtraPrice;
   const finalTotal = unitTotal * quantity;
 
   // Validation: counter groups just need to be present, radio/checkbox groups need minChoices
-  const isValid = optionGroups.every((g: any) => {
+  const isValid = optionGroups.every((g) => {
     let selectedCount = 0;
     if (g.groupType === 'counter') {
-      selectedCount = g.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
+      selectedCount = g.options?.reduce((sum: number, opt) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
     } else {
       selectedCount = (selections[g.id] || []).length;
     }
     return selectedCount >= g.minChoices;
   });
-
-  const sharedGroupsValid = sharedGroups.every((g: any) => (selections[g.id] || []).length >= g.minChoices);
 
   const handleConfirm = () => {
     if (!isValid) {
@@ -219,24 +179,17 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       return;
     }
 
-    if (isHalfAndHalf && secondHalfProductId && !secondHalfProductObj) {
-      alert("Selecione um sabor válido para a 2ª metade.");
-      return;
-    }
-
-    // Pseudo-opção "Meio a Meio" só pra aparecer no carrinho (nome, imagem, preço estimado) — o
-    // pedido de verdade manda o id do produto da 2ª metade separado (secondHalfProductId, abaixo),
-    // já que não existe opção de catálogo real pra "metade de pizza" pra validar contra. O backend
-    // recalcula esse preço do zero a partir do catálogo, nunca confia neste valor aqui.
+    // Pseudo-opção "Meio a Meio" só pra aparecer no carrinho (nome, preço combinado) — o pedido de
+    // verdade manda os ids dos Produtos-sabor extras separados (flavorProductIds, abaixo), já que o
+    // preço não é "por item" nesse grupo. O backend recalcula esse preço do zero a partir do
+    // catálogo, nunca confia neste valor aqui.
     const finalSelectedOptions = [...selectedOptionObjects];
-    if (isHalfAndHalf && secondHalfProductObj) {
+    if (selectedFlavorProducts.length > 0) {
       finalSelectedOptions.push({
         groupName: 'Meio a Meio',
-        name: `Meia ${secondHalfProductObj.name}`,
-        additionalPrice: halfAndHalfExtraPrice,
-        quantity: 1,
-        description: secondHalfProductObj.description,
-        imageUrl: secondHalfProductObj.imageUrl || (secondHalfProductObj.imageUrls && secondHalfProductObj.imageUrls.length > 0 ? secondHalfProductObj.imageUrls[0] : null)
+        name: selectedFlavorProducts.map((p) => p.name).join(' + '),
+        additionalPrice: flavorExtraPrice,
+        quantity: 1
       });
     }
 
@@ -246,18 +199,16 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
       observation,
       quantity,
       finalPrice: finalTotal,
-      secondHalfProductId: (isHalfAndHalf && secondHalfProductObj) ? secondHalfProductObj.id : null
+      flavorProductIds: selectedFlavorProducts.map((p) => p.id)
     };
     onAddToCart(finalItem);
     onClose();
   };
 
-  const renderGroupOptions = (group: any) => {
-    const displayOptions = group.isShared ? getSharedGroupDisplayOptions(group) : group.options;
-
+  const renderGroupOptions = (group: ProductOptionGroup) => {
     return (
       <div className={group.groupType === 'counter' ? 'counter-group' : (group.maxChoices === 1 ? "radio-group" : "checkbox-group")}>
-        {displayOptions.map((opt: any) => {
+        {group.options.map((opt) => {
           const isSelected = (selections[group.id] || []).includes(opt.id);
           const isMaxReached = (selections[group.id] || []).length >= group.maxChoices;
           const disabled = !isSelected && isMaxReached && group.maxChoices > 1;
@@ -324,10 +275,10 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     );
   };
 
-  const renderGroupSection = (group: any) => {
+  const renderGroupSection = (group: ProductOptionGroup) => {
     let selectedCount = 0;
     if (group.groupType === 'counter') {
-      selectedCount = group.options?.reduce((sum: number, opt: any) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
+      selectedCount = group.options?.reduce((sum: number, opt) => sum + (counterQuantities[opt.id] || 0), 0) || 0;
     } else {
       selectedCount = (selections[group.id] || []).length;
     }
@@ -347,6 +298,11 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
           </span>
         </div>
         {renderGroupOptions(group)}
+        {group.id === flavorGroup?.id && flavorExtraPrice > 0 && (
+          <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '12px' }}>
+            <span style={{ fontSize: '18px' }}>💰</span> Combinação de sabores: + R$ {formatCurrency(flavorExtraPrice)}
+          </div>
+        )}
       </section>
     );
   };
@@ -368,176 +324,11 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
             <p>{product.description}</p>
           </div>
 
-          {/* 1. Opções compartilhadas da categoria primeiro (Tamanho, Borda) — são propriedades da
-              pizza inteira, então precisam estar definidas antes de montar um meio a meio. */}
-          {sharedGroups.map(renderGroupSection)}
+          {/* 1. Opções compartilhadas da categoria (Tamanho, Borda) */}
+          {nonFlavorSharedGroups.map(renderGroupSection)}
 
-          {/* 2. Meio a Meio — só libera depois que Tamanho/Borda estão escolhidos, pra já filtrar
-              os sabores compatíveis e a interseção de opções corretamente. */}
-          {(product as any).allowsHalfAndHalf && (
-            <section className="highlight-section" style={{ marginTop: '24px', marginBottom: '24px', paddingBottom: '32px' }}>
-              <div style={{ display: 'flex', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 'var(--radius-full)', padding: '6px', marginBottom: '12px' }}>
-                <button
-                  onClick={() => { setIsHalfAndHalf(false); setSecondHalfProductId(''); }}
-                  style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: !isHalfAndHalf ? 'var(--primary)' : 'transparent', color: !isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-                >
-                  🍕 Inteira
-                </button>
-                <button
-                  onClick={() => { if (sharedGroupsValid) setIsHalfAndHalf(true); }}
-                  disabled={!sharedGroupsValid}
-                  title={!sharedGroupsValid ? 'Escolha as opções acima primeiro' : undefined}
-                  style={{ flex: 1, padding: '14px', borderRadius: 'var(--radius-full)', border: 'none', backgroundColor: isHalfAndHalf ? 'var(--primary)' : 'transparent', color: isHalfAndHalf ? '#fff' : 'var(--text-muted)', fontWeight: 600, fontSize: '16px', transition: 'all 0.3s ease', cursor: sharedGroupsValid ? 'pointer' : 'not-allowed', opacity: sharedGroupsValid ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}
-                >
-                  🌗 Meio a Meio
-                </button>
-              </div>
-
-              {!sharedGroupsValid && (
-                <p style={{ fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center', margin: '0 0 8px' }}>
-                  Escolha as opções acima para poder montar meio a meio.
-                </p>
-              )}
-
-              {isHalfAndHalf && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-                  {/* Metade 2 (Seleção) */}
-                  <div>
-                    <p style={{ fontSize: '17px', fontWeight: 600, margin: '0 0 10px 0', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      Escolha a 2ª Metade
-                    </p>
-
-                    <div style={{ position: 'relative', marginBottom: '16px' }}>
-                      <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                      <input
-                        type="text"
-                        placeholder="Buscar sabor para a 2ª metade..."
-                        value={searchHalf}
-                        onChange={(e) => setSearchHalf(e.target.value)}
-                        style={{ width: '100%', padding: '16px 16px 16px 48px', borderRadius: 'var(--radius-md)', border: '1px solid rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.05)', color: 'white', fontSize: '15px', outline: 'none', transition: 'all 0.2s ease' }}
-                        onFocus={(e) => e.target.style.borderColor = 'var(--primary)'}
-                        onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                      />
-                    </div>
-
-                    <div
-                      ref={carouselRef}
-                      className="hide-scrollbar"
-                      style={{
-                        display: 'flex', gap: '16px', overflowX: 'auto', paddingBottom: '16px',
-                        scrollSnapType: isDragging ? 'none' : 'x mandatory',
-                        margin: '0 -24px', padding: '0 24px 16px 24px',
-                        scrollBehavior: isDragging ? 'auto' : 'smooth',
-                        cursor: isDragging ? 'grabbing' : 'grab'
-                      }}
-                      onMouseDown={handleMouseDown}
-                      onMouseLeave={handleMouseLeave}
-                      onMouseUp={handleMouseUp}
-                      onMouseMove={handleMouseMove}
-                    >
-                      {availableProducts
-                        .filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase()))
-                        .filter(candidateOffersCurrentSharedSelection)
-                        .map(p => {
-                          const isSelected = secondHalfProductId === p.id;
-                          const img = p.imageUrl || (p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null);
-
-                          // Preço estimado usando o que ESSE sabor cobra pelas mesmas opções compartilhadas já escolhidas.
-                          const candidateGroups: any[] = p.optionGroups || [];
-                          const sharedExtra = sharedGroups.reduce((sum: number, g: any) => {
-                            const selectedIds = selections[g.id] || [];
-                            const candidateGroup = candidateGroups.find((cg: any) => cg.id === g.id);
-                            return sum + selectedIds.reduce((s: number, itemId: string) => {
-                              const opt = candidateGroup?.options.find((o: any) => o.id === itemId);
-                              return s + (opt?.additionalPrice || 0);
-                            }, 0);
-                          }, 0);
-                          const estimatedFlavorPrice = p.price + sharedExtra;
-
-                          const selectedBadges = sharedGroups.flatMap((g: any) =>
-                            (selections[g.id] || []).map((itemId: string) => g.options.find((o: any) => o.id === itemId)?.name).filter(Boolean)
-                          );
-
-                          return (
-                            <div
-                              key={p.id}
-                              onClick={() => {
-                                if (dragDist > 10) return;
-                                setSecondHalfProductId(isSelected ? '' : p.id);
-                              }}
-                              style={{
-                                flex: '0 0 calc(95% - 16px)',
-                                minWidth: '360px',
-                                scrollSnapAlign: 'start',
-                                display: 'flex', gap: '14px', padding: '16px',
-                                border: isSelected ? '1px solid var(--primary)' : '1px solid rgba(255,255,255,0.05)',
-                                borderRadius: 'var(--radius-md)',
-                                backgroundColor: isSelected ? 'rgba(255,87,34,0.08)' : 'rgba(0,0,0,0.2)',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease',
-                                alignItems: 'center',
-                                userSelect: 'none'
-                              }}
-                            >
-                              {img ? (
-                                <img src={img} alt={p.name} draggable={false} style={{ width: '84px', height: '84px', objectFit: 'cover', borderRadius: 'var(--radius-sm)', flexShrink: 0 }} />
-                              ) : (
-                                <div style={{ width: '84px', height: '84px', borderRadius: 'var(--radius-sm)', backgroundColor: 'rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', flexShrink: 0 }}>🍕</div>
-                              )}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, minWidth: 0 }}>
-                                <span style={{ fontWeight: 700, fontSize: '18px', color: isSelected ? 'var(--primary)' : 'var(--text-primary)' }}>{p.name}</span>
-                                {p.description && (
-                                  <span style={{
-                                    fontSize: '14px',
-                                    color: isSelected ? 'rgba(255,255,255,0.95)' : 'var(--text-muted)',
-                                    lineHeight: '1.3'
-                                  }}>
-                                    {p.description}
-                                  </span>
-                                )}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
-                                  <span style={{ fontSize: '17px', fontWeight: 700, color: 'var(--success)', whiteSpace: 'nowrap' }}>R$ {formatCurrency(estimatedFlavorPrice)}</span>
-                                  {selectedBadges.map((label, idx) => (
-                                    <span key={idx} style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 8px', borderRadius: '12px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                      {label}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                              <div style={{ paddingLeft: '4px', flexShrink: 0 }}>
-                                {isSelected ? (
-                                  <CheckCircle2 size={28} color="var(--primary)" />
-                                ) : (
-                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.1)' }} />
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      }
-
-                      {availableProducts.filter(p => p.categoryId === (product as any).categoryId && p.id !== product.id && p.name.toLowerCase().includes(searchHalf.toLowerCase())).filter(candidateOffersCurrentSharedSelection).length === 0 && (
-                        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '14px', backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 'var(--radius-md)' }}>
-                          Nenhum sabor disponível com as opções escolhidas{searchHalf ? ` para "${searchHalf}"` : ''}.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.5)', marginTop: '8px', textAlign: 'center' }}>
-                    💡 O valor da pizza meio a meio será calculado pelo sabor mais caro.
-                  </div>
-
-                  {secondHalfProductId && halfAndHalfExtraPrice > 0 && (
-                    <div style={{ fontSize: '14px', fontWeight: 500, color: 'var(--primary)', backgroundColor: 'rgba(255,87,34,0.1)', padding: '14px', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '10px', border: '1px solid rgba(255,87,34,0.2)', marginTop: '8px' }}>
-                      <span style={{ fontSize: '18px' }}>💰</span> O 2º sabor é mais caro. Diferença adicionada: + R$ {formatCurrency(halfAndHalfExtraPrice)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
+          {/* 2. Sabores extras (Meio a Meio) — mesma UI genérica de qualquer grupo compartilhado */}
+          {flavorGroup && renderGroupSection(flavorGroup)}
 
           {/* 3. Opções próprias do produto (ex: Adicionais extras) */}
           {ownGroups.map(renderGroupSection)}

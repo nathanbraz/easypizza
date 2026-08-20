@@ -177,10 +177,10 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
         quantity: item.quantity,
         unitPrice: item.finalPrice / item.quantity,
         notes: item.observation || null,
-        // Pizza Meio a Meio vai num campo próprio, não como addon — ela não tem
-        // productOptionItemId real pra validar (ver ProductModal), o backend recalcula o preço
-        // sozinho a partir do id do produto da 2ª metade.
-        secondHalfProductId: item.secondHalfProductId || null,
+        // Pizza Meio a Meio (Sabores) vai num campo próprio, não como addon — cada sabor extra é
+        // um Produto inteiro, não uma opção de catálogo solta (ver ProductModal). O backend
+        // recalcula o preço sozinho a partir do grupo de Sabores da categoria, nunca confia aqui.
+        flavorProductIds: item.flavorProductIds && item.flavorProductIds.length > 0 ? item.flavorProductIds : null,
         // Item veio do carrossel "Aproveite e leve também" — o backend confere se o produto tem
         // preço de combo configurado e aplica sozinho (nunca confia num preço vindo daqui).
         isCrossSell: item.isCrossSell || false,
@@ -266,15 +266,13 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                  {cart.map((item, index) => {
                    const halfOption = item.selectedOptions?.find((opt: any) => opt.groupName === 'Meio a Meio');
                    const isHalf = !!halfOption;
-                   
+
                    let title = item.baseProduct.name;
                    let description = item.baseProduct.description;
-                   
+
                    if (isHalf) {
-                     // A descrição da 2ª metade já vem pronta do ProductModal (finalSelectedOptions) —
-                     // sem precisar casar por nome do produto aqui.
-                     title = `Meia ${item.baseProduct.name} & ${halfOption.name.replace('1/2 ', 'Meia ')}`;
-                     description = `Metade 1: ${item.baseProduct.description || 'Sem descrição'}\nMetade 2: ${halfOption.description || 'Sem descrição'}`;
+                     // halfOption.name já vem com os nomes dos sabores extras juntos (ver ProductModal).
+                     title = `${item.baseProduct.name} + ${halfOption.name}`;
                    }
 
                    const img = item.baseProduct.imageUrl || (item.baseProduct.imageUrls && item.baseProduct.imageUrls.length > 0 ? item.baseProduct.imageUrls[0] : null);

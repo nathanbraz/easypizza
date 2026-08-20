@@ -388,7 +388,17 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                                 Preço uniforme
                               </span>
                             )}
+                            {g.isFlavorGroup && (
+                              <span style={{ fontSize: '11px', fontWeight: 600, color: '#22c55e', background: 'rgba(34, 197, 94, 0.1)', padding: '2px 8px', borderRadius: '10px' }}>
+                                🌗 Sabores
+                              </span>
+                            )}
                           </h4>
+                          {g.isFlavorGroup && (
+                            <p style={{ margin: '4px 0 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                              Marque com quais sabores este produto pode ser combinado no Meio a Meio.
+                            </p>
+                          )}
                         </div>
                         <div style={{ padding: '16px' }}>
                           <table className="admin-table" style={{ margin: 0 }}>
@@ -396,7 +406,7 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                               <tr>
                                 <th style={{ width: '60px' }}>Oferece?</th>
                                 <th>Opção</th>
-                                <th style={{ width: '160px' }}>Preço Adicional</th>
+                                {!g.isFlavorGroup && <th style={{ width: '160px' }}>Preço Adicional</th>}
                               </tr>
                             </thead>
                             <tbody>
@@ -413,28 +423,30 @@ export default function ProductOptionsModal({ product, tenantSlug, onClose }: Pr
                                     </label>
                                   </td>
                                   <td>{item.name}</td>
-                                  <td>
-                                    {g.hasUniformPricing ? (
-                                      <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
-                                        R$ {formatCurrency(item.additionalPrice ?? 0)} <span style={{ fontSize: '11px' }}>(definido na categoria)</span>
-                                      </span>
-                                    ) : (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>R$</span>
-                                        <input
-                                          key={`${item.id}-${item.additionalPrice}`}
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          className="form-input"
-                                          style={{ padding: '6px 8px' }}
-                                          defaultValue={item.additionalPrice ?? 0}
-                                          disabled={!item.isOffered}
-                                          onBlur={(e) => saveSharedItemPrice(item, e.target.value)}
-                                        />
-                                      </div>
-                                    )}
-                                  </td>
+                                  {!g.isFlavorGroup && (
+                                    <td>
+                                      {g.hasUniformPricing ? (
+                                        <span style={{ color: 'var(--text-muted)', fontSize: '13px' }}>
+                                          R$ {formatCurrency(item.additionalPrice ?? 0)} <span style={{ fontSize: '11px' }}>(definido na categoria)</span>
+                                        </span>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <span style={{ color: 'var(--text-muted)' }}>R$</span>
+                                          <input
+                                            key={`${item.id}-${item.additionalPrice}`}
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            className="form-input"
+                                            style={{ padding: '6px 8px' }}
+                                            defaultValue={item.additionalPrice ?? 0}
+                                            disabled={!item.isOffered}
+                                            onBlur={(e) => saveSharedItemPrice(item, e.target.value)}
+                                          />
+                                        </div>
+                                      )}
+                                    </td>
+                                  )}
                                 </tr>
                               ))}
                             </tbody>
