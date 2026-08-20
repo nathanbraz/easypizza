@@ -18,6 +18,8 @@ export interface Product {
   categoryName?: string; // Campo opcional para facilitar a UI
   allowsHalfAndHalf?: boolean; // Injetado pelo frontend (da categoria)
   optionGroups?: any[];
+  showInCrossSell?: boolean;
+  crossSellDiscountPrice?: number | null;
 }
 
 export interface ProductCategory {

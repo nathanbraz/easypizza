@@ -34,8 +34,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
   // State for counter quantities (key: itemId, value: quantity number)
   const [counterQuantities, setCounterQuantities] = useState<Record<string, number>>({});
 
-  // Cross-sell Drinks
-  const [selectedDrinks] = useState<any[]>([]);
   const [observation, setObservation] = useState('');
   const [quantity, setQuantity] = useState(1);
 
@@ -199,10 +197,8 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     return group.options.filter((o: any) => secondIds.has(o.id));
   };
 
-  const drinksTotal = selectedDrinks.reduce((sum, d) => sum + d.price, 0);
-
   const unitTotal = basePrice + optionsTotal + halfAndHalfExtraPrice;
-  const finalTotal = (unitTotal * quantity) + drinksTotal;
+  const finalTotal = unitTotal * quantity;
 
   // Validation: counter groups just need to be present, radio/checkbox groups need minChoices
   const isValid = optionGroups.every((g: any) => {
@@ -247,7 +243,6 @@ export default function ProductModal({ product, availableProducts, onClose, onAd
     const finalItem = {
       baseProduct: product,
       selectedOptions: finalSelectedOptions,
-      selectedDrinks,
       observation,
       quantity,
       finalPrice: finalTotal,

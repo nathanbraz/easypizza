@@ -110,8 +110,14 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
   };
 
   const addDrinkToCart = (drink: any) => {
-    // Open product modal to allow size/option selection
-    setCrossSellProduct(drink);
+    // Abre o ProductModal pra escolher tamanho/opções, se houver. Se o produto tem preço de
+    // combo configurado, troca o preço base já aqui — o ProductModal não sabe de cross-sell,
+    // só usa product.price normalmente. O preço final de verdade é sempre recalculado no
+    // backend (ver isCrossSell no payload do pedido), isso aqui é só pra exibir certo no carrinho.
+    const productForModal = drink.crossSellDiscountPrice != null
+      ? { ...drink, price: drink.crossSellDiscountPrice }
+      : drink;
+    setCrossSellProduct(productForModal);
   };
 
   const handleApplyCoupon = async (codeToApply?: string, isAuto: boolean = false) => {
@@ -175,23 +181,15 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
         // productOptionItemId real pra validar (ver ProductModal), o backend recalcula o preço
         // sozinho a partir do id do produto da 2ª metade.
         secondHalfProductId: item.secondHalfProductId || null,
-        addons: [
-          // Opções selecionadas pelo cliente (tamanho, borda, adicionais etc.) — a pseudo-opção
-          // "Meio a Meio" fica de fora daqui (só existe pra exibição no carrinho, ver acima).
-          ...(item.selectedOptions?.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any) => ({
-            productOptionItemId: opt.id || null,
-            addonName: opt.name,
-            price: opt.additionalPrice || 0,
-            quantity: opt.quantity || 1
-          })) || []),
-          // Bebidas selecionadas no modal do produto (cross-sell)
-          ...(item.selectedDrinks?.map((d: any) => ({
-            productOptionItemId: null,
-            addonName: d.name,
-            price: d.price || 0,
-            quantity: 1
-          })) || [])
-        ]
+        // Item veio do carrossel "Aproveite e leve também" — o backend confere se o produto tem
+        // preço de combo configurado e aplica sozinho (nunca confia num preço vindo daqui).
+        isCrossSell: item.isCrossSell || false,
+        addons: (item.selectedOptions?.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any) => ({
+          productOptionItemId: opt.id || null,
+          addonName: opt.name,
+          price: opt.additionalPrice || 0,
+          quantity: opt.quantity || 1
+        })) || [])
       }));
       
       const selectedPayment = paymentTypes.find(pt => pt.id === paymentTypeId);
@@ -307,11 +305,7 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                        {item.selectedOptions && item.selectedOptions.filter((opt: any) => opt.groupName !== 'Meio a Meio').map((opt: any, idx: number) => (
                           <div key={idx} className="custom-item addon">• {opt.groupName}: {opt.name} {opt.additionalPrice > 0 ? `(+R$ ${formatCurrency(opt.additionalPrice)})` : ''}</div>
                        ))}
-                       
-                       {item.selectedDrinks && item.selectedDrinks.map((d: any, idx: number) => (
-                          <div key={idx} className="custom-item drink">• Bebida inclusa: {d.name}</div>
-                       ))}
-                       
+
                        {item.observation && <div className="custom-obs">Observação: {item.observation}</div>}
                      </div>
 
@@ -331,10 +325,9 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
 
                {/* Cross-Sell Bebidas */}
                {(() => {
-                 const hasDrinkInCart = cart.some(item => 
-                   item.baseProduct.categoryName?.toLowerCase().includes('bebida') || 
-                   item.baseProduct.categoryName?.toLowerCase().includes('drink') || 
-                   (item.selectedDrinks && item.selectedDrinks.length > 0)
+                 const hasDrinkInCart = cart.some(item =>
+                   item.baseProduct.categoryName?.toLowerCase().includes('bebida') ||
+                   item.baseProduct.categoryName?.toLowerCase().includes('drink')
                  );
                  
                  if (hasDrinkInCart) return null;
@@ -349,7 +342,11 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                      <div className="horizontal-scroll">
                         {availableDrinks.map(drink => {
                           let displayPrice = `+ R$ ${formatCurrency(drink.price)}`;
-                          
+                          // Preço de combo: só faz sentido pra produto de preço fixo (sem opções
+                          // obrigatórias variando o total) — combina com o desconto configurado no
+                          // admin. O preço final de verdade é sempre recalculado no backend.
+                          const hasCombo = drink.price > 0 && drink.crossSellDiscountPrice != null && drink.crossSellDiscountPrice < drink.price;
+
                           if (drink.price === 0) {
                             let minAdditionalPrice = 0;
                             let hasMandatoryOptions = false;
@@ -385,7 +382,16 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
                                 )}
                               </div>
                               <span className="cross-sell-name">{drink.name}</span>
-                              <span className="cross-sell-price">{displayPrice}</span>
+                              {hasCombo ? (
+                                <span className="cross-sell-price">
+                                  <span style={{ textDecoration: 'line-through', color: 'var(--text-muted, #888)', fontWeight: 400, marginRight: '4px' }}>
+                                    R$ {formatCurrency(drink.price)}
+                                  </span>
+                                  R$ {formatCurrency(drink.crossSellDiscountPrice)}
+                                </span>
+                              ) : (
+                                <span className="cross-sell-price">{displayPrice}</span>
+                              )}
                               <button className="cross-sell-add"><Plus size={14} /> Adicionar</button>
                             </div>
                           );
@@ -626,12 +632,15 @@ export default function CheckoutModal({ cart, updateCart, availableProducts = []
       </div>
       
       {crossSellProduct && (
-        <ProductModal 
+        <ProductModal
           product={crossSellProduct}
           availableProducts={availableProducts}
           onClose={() => setCrossSellProduct(null)}
           onAddToCart={(item) => {
-             updateCart([...cart, item]);
+             // Marca o item como vindo da sugestão de cross-sell — o pedido final manda esse
+             // sinalizador pro backend, que decide sozinho se o produto tem preço de combo e
+             // aplica (ou não faz nada, se não tiver).
+             updateCart([...cart, { ...item, isCrossSell: true }]);
              setCrossSellProduct(null);
           }}
         />

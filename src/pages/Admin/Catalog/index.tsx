@@ -40,6 +40,9 @@ export default function CatalogManager() {
   const [uploadingImage, setUploadingImage] = useState<boolean>(false);
   const [isAvailable, setIsAvailable] = useState<boolean>(true);
   const [showInCrossSell, setShowInCrossSell] = useState<boolean>(false);
+  // Preço cobrado quando este produto é adicionado via sugestão no checkout, em vez do preço
+  // normal — string vazia = sem desconto, mantém o preço de sempre.
+  const [crossSellDiscountPrice, setCrossSellDiscountPrice] = useState<string>('');
 
   // Estados extras para Adicionais
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
@@ -119,6 +122,7 @@ export default function CatalogManager() {
       setPreviewImageUrls(item?.imageUrls || []);
       setIsAvailable(item ? item.isAvailable : true);
       setShowInCrossSell(item ? item.showInCrossSell : false);
+      setCrossSellDiscountPrice(item?.crossSellDiscountPrice != null ? String(item.crossSellDiscountPrice) : '');
     } else if (activeTab === 'categorias') {
       setAllowsHalfAndHalf(item ? item.allowsHalfAndHalf : false);
     }
@@ -199,7 +203,10 @@ export default function CatalogManager() {
           price: parseFloat(itemPrice.replace(',', '.')),
           imageUrls: previewImageUrls,
           isAvailable,
-          showInCrossSell
+          showInCrossSell,
+          crossSellDiscountPrice: showInCrossSell && crossSellDiscountPrice.trim() !== ''
+            ? parseFloat(crossSellDiscountPrice.replace(',', '.'))
+            : null
         };
         if (editingItem) await api.put(`/products/${tenantSlug}/${editingItem.id}`, payload);
         else await api.post(`/products/${tenantSlug}`, payload);
@@ -443,14 +450,28 @@ export default function CatalogManager() {
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Ative para mostrar este produto na vitrine "Aproveite e leve também" ao finalizar o pedido.</span>
                       </div>
                       <label className="toggle-switch">
-                        <input 
-                          type="checkbox" 
+                        <input
+                          type="checkbox"
                           checked={showInCrossSell}
                           onChange={(e) => setShowInCrossSell(e.target.checked)}
                         />
                         <span className="slider"></span>
                       </label>
                     </div>
+
+                    {showInCrossSell && (
+                      <div className="form-group" style={{ marginTop: '12px' }}>
+                        <label>Preço no combo (opcional)</label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder={`Ex: ${itemPrice ? (parseFloat(itemPrice.replace(',', '.')) * 0.8).toFixed(2) : '4.50'} (deixe em branco pra usar o preço normal)`}
+                          value={crossSellDiscountPrice}
+                          onChange={(e) => setCrossSellDiscountPrice(e.target.value)}
+                        />
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Preço cobrado só quando sugerido no carrinho. Em branco = usa o preço normal (R$ {itemPrice || '0,00'}).</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
